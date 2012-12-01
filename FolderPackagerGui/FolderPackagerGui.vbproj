@@ -172,10 +172,6 @@
       <Project>{D03D3545-EB61-43DF-9736-8D0502F3BE9D}</Project>
       <Name>MetadataUtilities</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\MARCVocabulary\MARCVocabulary\MARCVocabulary.vbproj">
-      <Project>{A5BEF2BC-2527-4FE1-B363-252A55319470}</Project>
-      <Name>MARCVocabulary</Name>
-    </ProjectReference>
     <ProjectReference Include="..\CollectionsRegistry\CollectionsRegistry.vbproj">
       <Project>{178E628C-C603-40BE-B7BA-BA096F9DA990}</Project>
       <Name>CollectionsRegistry</Name>
