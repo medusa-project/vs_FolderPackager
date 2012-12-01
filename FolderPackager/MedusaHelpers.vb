@@ -1,7 +1,12 @@
 ﻿Imports System.IO
 Imports Uiuc.Library.Premis
+Imports Uiuc.Library.MetadataUtilities
+Imports Uiuc.Library.Ldap
 Imports System.Text.RegularExpressions
 Imports System.Configuration
+Imports System.Runtime.InteropServices
+Imports System.Security
+Imports System.Net.Mail
 
 ''' <summary>
 ''' In order to keep the core Premis classes as generic as possible, any code that is unique to the Medusa Repository project should go here.
@@ -33,39 +38,56 @@ Public Class MedusaHelpers
         Directory.CreateDirectory(Path.Combine(folder, kv.Key))
         For Each obj In kv.Value.Objects.Where(Function(o) o.ObjectCategory = PremisObjectCategory.File)
           Dim newFPath As String = Path.Combine(folder, kv.Key, Path.GetFileName(obj.GetFilenameIdentifier.IdentifierValue))
-          If File.Exists(newFPath) Then
-            If ConfigurationManager.AppSettings.Item("OverwriteObjects").ToUpper = "TRUE" Then
+          Dim origFPath As String = Path.Combine(folder, rootPath, obj.GetFilenameIdentifier.IdentifierValue)
+          'if these are the same value which can happen for metadata files, then we dpon't need to do anything
+          If origFPath.ToLower.Trim <> newFPath.ToLower.Trim Then
+            If File.Exists(newFPath) Then
+              'because we are just rearranging the file structure this should happen regardless of the OverwriteObjects AppSetting
               File.Delete(newFPath)
               Trace.TraceWarning("File '{0}' already exists.  It will be deleted and replaced with the new file of same name.", newFPath)
             End If
-            File.Move(Path.Combine(folder, rootPath, obj.GetFilenameIdentifier.IdentifierValue), newFPath)
-          Else
-            Trace.TraceError("File '{0}' already exists.", newFPath)
-            Trace.Flush()
-            Throw New PackagerException(String.Format("File '{0}' already exists.", newFPath))
+            File.Move(origFPath, newFPath)
           End If
         Next
 
         'there should only be one premis object per container after the partitioning
-        If kv.Value.Objects.Count <> 1 Then
-          Trace.TraceError("Unexpected number of objects in PREMIS container")
-          Trace.Flush()
-          Throw New PackagerException("Unexpected number of objects in PREMIS container")
-        End If
+        'unless the object contains metadata file
+        'If kv.Value.Objects.Count <> 1 Then
+        '  Trace.TraceError("Unexpected number of objects in PREMIS container")
+        '  Trace.Flush()
+        '  Throw New PackagerException("Unexpected number of objects in PREMIS container")
+        'End If
 
         'after the partition, if creating subdirs, the FOLDERNAME identifier is not needed
         kv.Value.Objects.Item(0).ObjectIdentifiers.RemoveAll(Function(i) i.IdentifierType = "FOLDERNAME")
 
         'after the partition, if creating subdirs, the FILENAME identifier should have any path component removed
-        If kv.Value.Objects.Item(0).ObjectCategory = PremisObjectCategory.File Then
-          kv.Value.Objects.Item(0).GetFilenameIdentifier.IdentifierValue = Path.GetFileName(kv.Value.Objects.Item(0).GetFilenameIdentifier.IdentifierValue)
+        For i As Integer = 0 To kv.Value.Objects.Count - 1
+          If kv.Value.Objects.Item(i).ObjectCategory = PremisObjectCategory.File Then
+            kv.Value.Objects.Item(i).GetFilenameIdentifier.IdentifierValue = Path.GetFileName(kv.Value.Objects.Item(i).GetFilenameIdentifier.IdentifierValue)
+          End If
+        Next
+
+        If MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA Then
+          kv.Value.SaveXML(Path.Combine(folder, kv.Key, kv.Value.Objects.First.GetDefaultFileName("premis_", "xml")))
+        ElseIf MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA_MULTIPLE Then
+          kv.Value.SaveEachXML(Path.Combine(folder, kv.Key))
+        Else
+          Throw New PackagerException(String.Format("Unexpected SaveFileAs Setting '{0}'.", MedusaAppSettings.Settings.SaveFilesAs))
         End If
 
-        kv.Value.SaveXML(Path.Combine(folder, kv.Key, kv.Value.Objects.First.GetDefaultFileName("premis_", "xml")))
       Next
     Else
       For Each kv As KeyValuePair(Of String, PremisContainer) In conList
-        kv.Value.SaveXML(Path.Combine(folder, kv.Value.Objects.First.GetDefaultFileName("premis_", "xml")))
+
+        If MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA Then
+          kv.Value.SaveXML(Path.Combine(folder, kv.Value.Objects.First.GetDefaultFileName("premis_", "xml")))
+        ElseIf MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA_MULTIPLE Then
+          kv.Value.SaveEachXML(folder)
+        Else
+          Throw New PackagerException(String.Format("Unexpected SaveFileAs Setting '{0}'.", MedusaAppSettings.Settings.SaveFilesAs))
+        End If
+
       Next
     End If
 
@@ -105,7 +127,7 @@ Public Class MedusaHelpers
           'metadata is kept with its related objects so do nothing
 
           Select Case r.RelationshipSubType
-            Case "HAS_ROOT"
+            Case "HAS_ROOT", "MARC", "DC_RDF", "SPREADSHEET"
 
             Case Else
               Trace.TraceError(String.Format("Unexpected PREMIS Relationship Sub-type: {0}/{1}", r.RelationshipType, r.RelationshipSubType))
@@ -299,6 +321,156 @@ Public Class MedusaHelpers
     Next
 
     Return ret.Distinct.ToList
+  End Function
+
+  ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+  'Here is async copy routine from http://www.informit.com/guides/content.aspx?g=dotnet&seqNum=827
+  'See also http://stackoverflow.com/questions/1540658/net-asynchronous-stream-read-write
+  ''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
+
+  ''' <summary>
+  '''  Copies a stream.
+  ''' </summary>
+  ''' <param name="source">The stream containing the source data.</param>
+  ''' <param name="target">The stream that will receive the source data.</param>
+  ''' <remarks>
+  ''' This function copies until no more can be read from the stream
+  '''  and does not close the stream when done.<br/>
+  ''' Read and write are performed simultaneously to improve throughput.<br/>
+  ''' If no data can be read for 60 seconds, the copy will time-out.
+  ''' 
+  ''' NOTE: Based on a bit of testing this performs no better than Stream.CopyTO
+  ''' </remarks>
+  Public Shared Sub CopyStreamToStream(source As Stream, target As Stream, bufSize As Integer)
+    ' This stream copy supports a source-read happening at the same time
+    ' as target-write.  A simpler implementation would be to use just
+    ' Write() instead of BeginWrite(), at the cost of speed.
+
+    Dim readbuffer(bufSize) As Byte
+    Dim writebuffer(bufSize) As Byte
+    Dim asyncResult As IAsyncResult = Nothing
+
+    While True
+      ' Read data into the readbuffer.  The previous call to BeginWrite, if any,
+      '  is executing in the background.
+      Dim read As Integer = source.Read(readbuffer, 0, readbuffer.Length)
+
+      ' Ok, we have read some data and we're ready to write it, so wait here
+      '  to make sure that the previous write is done before we write again.
+      If asyncResult IsNot Nothing Then
+        ' This should work down to ~0.01kb/sec
+        asyncResult.AsyncWaitHandle.WaitOne(60000)
+        target.EndWrite(asyncResult) ' Last step to the 'write'.
+        If (Not asyncResult.IsCompleted) Then ' Make sure the write really completed.
+          Throw New IOException("Stream write failed.")
+        End If
+      End If
+
+      If read <= 0 Then
+        Return ' source stream says we're done - nothing else to read.
+      End If
+
+      ' Swap the read and write buffers so we can write what we read, and we can
+      '  use the then use the other buffer for our next read.
+      Dim tbuf() As Byte = writebuffer
+      writebuffer = readbuffer
+      readbuffer = tbuf
+
+      ' Asynchronously write the data, asyncResult.AsyncWaitHandle will
+      ' be set when done.
+      asyncResult = target.BeginWrite(writebuffer, 0, read, Nothing, Nothing)
+    End While
+  End Sub
+
+  ''' <summary>
+  ''' Given the filename, return the relationship type between the parent object and this file
+  ''' If the specific type cannot be determined the default value is returned
+  ''' </summary>
+  ''' <param name="filename"></param>
+  ''' <param name="dflt"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public Shared Function GetMedusaRelationshipType(filename As String, dflt As String) As String
+    Dim ret As String = dflt
+
+    If Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataMarcRegex, RegexOptions.IgnoreCase) Then
+      ret = "METADATA"
+    ElseIf Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataDcRdfRegex, RegexOptions.IgnoreCase) Then
+      ret = "METADATA"
+    ElseIf Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataSpreadsheetRegex, RegexOptions.IgnoreCase) Then
+      ret = "METADATA"
+    End If
+
+    Return ret
+  End Function
+
+  ''' <summary>
+  ''' Given the filename and base type, return the relationship subtype between the parent object and this file
+  ''' If the specific subtype cannot be determined the default value is returned
+  ''' </summary>
+  ''' <param name="filename"></param>
+  ''' <param name="baseType"></param>
+  ''' <param name="dflt"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public Shared Function GetMedusaRelationshipSubtype(filename As String, baseType As String, dflt As String) As String
+    Dim ret As String = dflt
+
+    If baseType = "METADATA" Then
+      If Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataMarcRegex, RegexOptions.IgnoreCase) Then
+        ret = "MARC"
+      ElseIf Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataDcRdfRegex, RegexOptions.IgnoreCase) Then
+        ret = "DC_RDF"
+      ElseIf Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataSpreadsheetRegex, RegexOptions.IgnoreCase) Then
+        ret = "SPREADSHEET"
+      End If
+    End If
+
+    Return ret
+  End Function
+
+  Public Shared Sub EmailException(ex As Exception)
+    Dim msgStr As String = String.Format("{0}{2}{2}{1}", ex.Message, ex.StackTrace, vbCrLf)
+    MedusaHelpers.EmailErrorMessage(msgStr)
+  End Sub
+
+
+  Public Shared Sub EmailErrorMessage(msgStr As String)
+    Try
+      Dim usr = UIUCLDAPUser.Create(Principal.WindowsIdentity.GetCurrent.Name)
+      Dim msg As New System.Net.Mail.MailMessage("medusa-admin@library.illinois.edu", usr.EMail)
+      msg.Subject = String.Format("Medusa Error Report: {0}", My.Application.Info.Title)
+      msg.Body = msgStr
+
+      Dim smtp As New SmtpClient()
+      smtp.Send(msg)
+    Catch ex2 As Exception
+      Console.Error.WriteLine(String.Format("Email Error: {0}", ex2.Message))
+      Trace.TraceError("{0}", ex2.Message)
+    End Try
+
+  End Sub
+
+  Public Shared Function GetFileNamePrefix(relat As String, subtype As String) As String
+    Dim ret As String = "file_"
+
+    Select Case relat
+      Case "METADATA"
+        Select Case subtype
+          Case "MARC"
+            ret = "marc_"
+          Case "DC_RDF"
+            ret = "dc_rdf_"
+          Case Else
+            ret = subtype.ToLower & "_"
+        End Select
+    End Select
+
+    Return ret
+  End Function
+
+  <DllImport("kernel32.dll", SetLastError:=True, CharSet:=CharSet.Auto)> _
+  Public Shared Function CreateHardLink(ByVal lpFileName As String, ByVal lpExistingFileName As String, ByVal lpSecurityAttributes As IntPtr) As Boolean
   End Function
 
 End Class

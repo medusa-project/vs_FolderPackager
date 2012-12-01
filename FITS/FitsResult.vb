@@ -3,6 +3,7 @@ Imports System.Configuration
 Imports System.IO
 Imports Uiuc.Library.Premis
 Imports Uiuc.Library.Ldap
+Imports Uiuc.Library.MetadataUtilities
 Imports System.Security
 
 Public Class FitsResult
@@ -29,10 +30,14 @@ Public Class FitsResult
     End Get
   End Property
 
-  Public ReadOnly Property Created As DateTime
+  Public ReadOnly Property Created As DateTime?
     Get
       Dim nd As XmlElement = _xml.SelectSingleNode("//fits:fileinfo/fits:created", _xmlns)
-      Return FixDateTime(nd.InnerText)
+      If nd IsNot Nothing Then
+        Return FixDateTime(nd.InnerText)
+      Else
+        Return Nothing
+      End If
     End Get
   End Property
 
@@ -59,7 +64,7 @@ Public Class FitsResult
 
 
   ''' <summary>
-  ''' Fix datetime strings for some strange reason datetimes are formatted incorrectly with only colons
+  ''' Fix datetime strings; for some strange reason datetimes are formatted with only colons as separators
   ''' </summary>
   ''' <param name="dts"></param>
   ''' <returns></returns>
@@ -97,6 +102,33 @@ Public Class FitsResult
 
   End Function
 
+  Public Function GetPremisSignificantProperties() As List(Of PremisSignificantProperties)
+    Dim ret As New List(Of PremisSignificantProperties)
+
+    Dim nds As XmlNodeList = _xml.SelectNodes("//fits:metadata/*/*", _xmlns)
+
+    For Each nd As XmlElement In nds
+      If nd.GetAttribute("status") <> "CONFLICT" Then
+        Dim sp As New PremisSignificantProperties(nd.LocalName, nd.InnerText)
+        ret.Add(sp)
+      Else
+        'TODO: Warning message or PREMIS Event?
+      End If
+    Next
+
+    Return ret
+  End Function
+
+  Public Function GetPremisAgent(id As PremisIdentifier) As PremisAgent
+
+    Dim agent As PremisAgent = New PremisAgent(id.IdentifierType, id.IdentifierValue)
+    agent.AgentNames.Add(String.Format("FITS {0}", Me.FitsVersion))
+    agent.AgentType = "SOFTWARE"
+
+    Return agent
+
+  End Function
+
 
   Public ReadOnly Property PremisCreatingApplications As List(Of PremisCreatingApplication)
     Get
@@ -108,7 +140,9 @@ Public Class FitsResult
         Dim cappName As String = nd.InnerText
         If cappName.Length > 1 Then 'some tools seem to generate a value of '/' for application, so ignore short names
           Dim capp As New PremisCreatingApplication(cappName)
-          capp.DateCreatedByApplication = Me.Created
+          If Me.Created.HasValue Then
+            capp.DateCreatedByApplication = Me.Created
+          End If
           'capp.CreatingApplicationExtensions.Add(nd)
           ret.Add(capp)
         End If
@@ -211,7 +245,7 @@ Public Class FitsResult
       End If
 
 
-        Return ret
+      Return ret
     End Get
   End Property
 
@@ -230,8 +264,8 @@ Public Class FitsResult
     p.StartInfo.UseShellExecute = False
     p.StartInfo.RedirectStandardOutput = True
     p.StartInfo.RedirectStandardError = True
-    p.StartInfo.FileName = Path.Combine(ConfigurationManager.AppSettings.Item("FitsHome"), ConfigurationManager.AppSettings.Item("FitsScript"))
-    p.StartInfo.WorkingDirectory = ConfigurationManager.AppSettings.Item("FitsHome")
+    p.StartInfo.FileName = MedusaAppSettings.Settings.FitsScriptPath
+    p.StartInfo.WorkingDirectory = MedusaAppSettings.Settings.FitsHome
     p.StartInfo.Arguments = String.Format("-i ""{0}""", filename)
     p.Start()
     'Do not wait for the child process to exit before

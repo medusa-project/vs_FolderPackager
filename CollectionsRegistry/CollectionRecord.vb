@@ -40,9 +40,24 @@ Public Class CollectionRecord
   Public ReadOnly Property Uuid As String
     Get
       Dim ret As String = ""
-      Dim nd = _xml.SelectSingleNode("/m:mods/m:identifier[@type='uuid']", _xmlns)
-      If nd IsNot Nothing Then
-        ret = nd.InnerText
+      If _xml IsNot Nothing Then
+        Dim nd = _xml.SelectSingleNode("/m:mods/m:identifier[@type='uuid']", _xmlns)
+        If nd IsNot Nothing Then
+          ret = nd.InnerText
+        End If
+      End If
+      Return ret
+    End Get
+  End Property
+
+  Public ReadOnly Property CollectionTitle As String
+    Get
+      Dim ret As String = ""
+      If _xml IsNot Nothing Then
+        Dim nd = _xml.SelectSingleNode("/m:mods/m:titleInfo/m:title", _xmlns)
+        If nd IsNot Nothing Then
+          ret = nd.InnerText
+        End If
       End If
       Return ret
     End Get
@@ -56,13 +71,23 @@ Public Class CollectionRecord
 
   Public Sub New(id As String, folder As String)
     _id = id
-    _url = String.Format(ConfigurationManager.AppSettings.Item("GetCollectionModsUrl"), id)
+    _url = String.Format(MedusaAppSettings.Settings.GetCollectionModsUrl, id)
 
     _evt = New PremisEvent("TEMP", "TEMP", "CAPTURE")
     _objChar = New PremisObjectCharacteristics
 
     _outfile = FetchURL(_url, _evt, _objChar, folder, Path.Combine(folder, "mods.xml"))
 
+  End Sub
+
+  Public Sub New(id As String)
+    _id = id
+    _url = String.Format(MedusaAppSettings.Settings.GetCollectionModsUrl, id)
+
+    _evt = New PremisEvent("TEMP", "TEMP", "CAPTURE")
+    _objChar = New PremisObjectCharacteristics
+
+    _outfile = FetchURL(_url, _evt, _objChar, Path.GetTempPath, Path.GetTempFileName)
   End Sub
 
   Protected Sub New()
@@ -94,13 +119,15 @@ Public Class CollectionRecord
         httpRsp = httpReq.GetResponse
         Exit Do
       Catch ex As WebException
-        If tries >= MAX_RETRY_COUNT Then
+        If tries >= MAX_RETRY_COUNT Or CType(ex.Response, HttpWebResponse).StatusCode = HttpStatusCode.NotFound Then
           Trace.TraceError("Error in Folder: {0}", recPath)
           Trace.TraceError("Fetching URL: {1} -- {0}", ex.Message, url)
 
           Dim evtInfo As New PremisEventOutcomeInformation([Enum].GetName(GetType(WebExceptionStatus), ex.Status))
           Dim evtDet As New PremisEventOutcomeDetail(ex.Message)
           evtInfo.EventOutcomeDetails.Add(evtDet)
+          Dim evtDet2 As New PremisEventOutcomeDetail("A default MODS collection record will be created instead.")
+          evtInfo.EventOutcomeDetails.Add(evtDet2)
           pEvt.EventOutcomeInformation.Add(evtInfo)
           Return ""
           Exit Function
@@ -135,7 +162,7 @@ Public Class CollectionRecord
       outFileName = saveFile
     End If
 
-    Dim alg As String = ConfigurationManager.AppSettings.Item("ChecksumAlgorithm")
+    Dim alg As String = MedusaAppSettings.Settings.ChecksumAlgorithm
 
     Dim strm As Stream = httpRsp.GetResponseStream
 

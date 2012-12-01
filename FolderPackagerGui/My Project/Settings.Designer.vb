@@ -64,9 +64,9 @@ Namespace My
     Friend Module MySettingsProperty
         
         <Global.System.ComponentModel.Design.HelpKeywordAttribute("My.Settings")>  _
-        Friend ReadOnly Property Settings() As Global.Uiuc.Library.FolderPackager.My.MySettings
+        Friend ReadOnly Property Settings() As Global.Uiuc.Library.FolderPackagerGui.My.MySettings
             Get
-                Return Global.Uiuc.Library.FolderPackager.My.MySettings.Default
+                Return Global.Uiuc.Library.FolderPackagerGui.My.MySettings.Default
             End Get
         End Property
     End Module
