@@ -3,9 +3,13 @@ Imports System.Configuration
 Imports System.IO
 Imports Uiuc.Library.Premis
 Imports Uiuc.Library.Ldap
-Imports Uiuc.Library.MetadataUtilities
+Imports Uiuc.Library.Medusa
 Imports System.Security
 
+''' <summary>
+''' Represent the results of running a file through the FITS file characterization program
+''' </summary>
+''' <remarks></remarks>
 Public Class FitsResult
   Private _xml As XmlDocument
   Private _xmlns As XmlNamespaceManager
@@ -119,9 +123,9 @@ Public Class FitsResult
     Return ret
   End Function
 
-  Public Function GetPremisAgent(id As PremisIdentifier) As PremisAgent
+  Public Function GetPremisAgent() As PremisAgent
 
-    Dim agent As PremisAgent = New PremisAgent(id.IdentifierType, id.IdentifierValue)
+    Dim agent As PremisAgent = New PremisAgent("SOFTWARE_VERSION", String.Format("FITS {0}", Me.FitsVersion))
     agent.AgentNames.Add(String.Format("FITS {0}", Me.FitsVersion))
     agent.AgentType = "SOFTWARE"
 

@@ -13,7 +13,8 @@
     <AssemblyName>FITS</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>Windows</MyType>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -23,6 +24,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DocumentationFile>FITS.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -32,6 +34,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DocumentationFile>FITS.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <OptionExplicit>On</OptionExplicit>
@@ -109,13 +112,13 @@
       <Project>{E1F12AC9-D4FB-4C9C-BF1F-712B1FE2E667}</Project>
       <Name>LDAP</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\ContentDMPackager\MetadataUtilities\MetadataUtilities.vbproj">
-      <Project>{D03D3545-EB61-43DF-9736-8D0502F3BE9D}</Project>
-      <Name>MetadataUtilities</Name>
-    </ProjectReference>
     <ProjectReference Include="..\..\ContentDMPackager\PREMIS\PREMIS.vbproj">
       <Project>{164A9D55-4F5B-4B32-8D4C-90F044936FCA}</Project>
       <Name>PREMIS</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Medusa\Medusa.vbproj">
+      <Project>{ce8c3719-d278-4675-9da7-0df6665f66ca}</Project>
+      <Name>Medusa</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
