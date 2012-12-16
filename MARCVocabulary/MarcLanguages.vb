@@ -1,5 +1,9 @@
 ﻿Imports System.Xml
 
+''' <summary>
+''' Provides access to the LoC code list for languages.
+''' </summary>
+''' <remarks></remarks>
 Public Class MarcLanguages
   Const LanguagesXmlUrl As String = "http://www.loc.gov/standards/codelists/languages.xml"
 

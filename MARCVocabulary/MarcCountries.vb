@@ -1,5 +1,9 @@
 ﻿Imports System.Xml
 
+''' <summary>
+''' Provides access to the LoC code list for copuntries.
+''' </summary>
+''' <remarks></remarks>
 Public Class MarcCountries
   Const CountriesXmlUrl As String = "http://www.loc.gov/standards/codelists/countries.xml"
 
