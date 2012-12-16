@@ -6,8 +6,13 @@ Imports System.Text.RegularExpressions
 Imports System.IO
 Imports System.Security.Cryptography
 Imports Uiuc.Library.Premis
+Imports Uiuc.Library.Medusa
 Imports Uiuc.Library.MetadataUtilities
 
+''' <summary>
+''' Represents a collection record from the Medusa Collections Registry
+''' </summary>
+''' <remarks></remarks>
 Public Class CollectionRecord
   Const MAX_RETRY_COUNT = 5
 
