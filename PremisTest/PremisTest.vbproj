@@ -13,9 +13,10 @@
     <AssemblyName>PremisTest</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>Windows</MyType>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <ProjectTypeGuids>{3AC096D0-A1C2-E12C-1390-A8335801FDAB};{F184B08F-C81C-45F6-A57F-5ABD9991F28F}</ProjectTypeGuids>
     <ReferencePath>$(DevEnvDir)PublicAssemblies\</ReferencePath>
+    <TargetFrameworkProfile />
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -25,6 +26,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DocumentationFile>PremisTest.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -34,6 +36,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DocumentationFile>PremisTest.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <OptionExplicit>On</OptionExplicit>
@@ -56,6 +59,10 @@
     </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.EnterpriseServices" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Web.Services" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
   </ItemGroup>
@@ -87,6 +94,10 @@
     <ProjectReference Include="..\..\ContentDMPackager\PREMIS\PREMIS.vbproj">
       <Project>{164A9D55-4F5B-4B32-8D4C-90F044936FCA}</Project>
       <Name>PREMIS</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\NetFedora\NetFedora.vbproj">
+      <Project>{5BAB8A19-A3A4-4604-AA6F-3E42CA74922B}</Project>
+      <Name>NetFedora</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.VisualBasic.targets" />
