@@ -21,25 +21,6 @@ Public Class MedusaAppSettings
     Return _thisInst
   End Function
 
-  Private _idMapFile As String = Nothing
-  Public Property IdMapFile As String
-    Get
-      If _idMapFile Is Nothing Then
-        _idMapFile = ConfigurationManager.AppSettings.Item("IdMapFile")
-      End If
-      Return _idMapFile
-    End Get
-    Set(value As String)
-      _idMapFile = value
-    End Set
-  End Property
-
-  Public ReadOnly Property IdMapFilePath As String
-    Get
-      Return Path.Combine(WorkingFolder, IdMapFile)
-    End Get
-  End Property
-
   Private _handleMapFile As String = Nothing
   Public Property HandleMapFile As String
     Get
@@ -65,7 +46,7 @@ Public Class MedusaAppSettings
       If _agentMapFile Is Nothing Then
         _agentMapFile = ConfigurationManager.AppSettings.Item("AgentMapFile")
       End If
-      Return _idMapFile
+      Return _agentMapFile
     End Get
     Set(value As String)
       _agentMapFile = value
