@@ -9,7 +9,9 @@ Imports Uiuc.Library.Medusa
 Public Class IdManager
 
   ''' <summary>
-  ''' Given the human-readable identifier return the  medusa id
+  ''' Given the human-readable identifier return the corresponding medusa identifier, 
+  ''' if the human-readable id does not exist in the database then a new medusa id is generated for it
+  ''' and added to the database and it is returned
   ''' </summary>
   ''' <param name="humanId"></param>
   ''' <returns></returns>
@@ -22,6 +24,10 @@ Public Class IdManager
 
     End Using
 
+    If String.IsNullOrWhiteSpace(id) Then
+      id = IdManager.AddIdentifier(humanId, IdManager.GenerateLocalIdentifier)
+    End If
+
     Return id
   End Function
 
@@ -29,7 +35,7 @@ Public Class IdManager
   ''' Given the medusa identifier return the  human-readable id
   ''' </summary>
   ''' <param name="medusaId"></param>
-  ''' <returns></returns>
+  ''' <returns>The human-readable identifier or empty string if the medusa identifier is not found</returns>
   ''' <remarks></remarks>
   Public Shared Function GetHumanIdentifier(medusaId As String) As String
     Dim id As String = ""
