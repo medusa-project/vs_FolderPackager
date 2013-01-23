@@ -71,11 +71,14 @@
     <Import Include="System.Xml.Linq" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="FedoraDatastream.vb" />
     <Compile Include="FedoraObject.vb" />
+    <Compile Include="FedoraSearchResults.vb" />
     <Compile Include="FedoraRepository.vb" />
-    <Compile Include="FoxmlDataStream.vb" />
+    <Compile Include="FoxmlDatastream.vb" />
     <Compile Include="FoxmlDatastreamVersion.vb" />
     <Compile Include="FoxmlDigitalObject.vb" />
+    <Compile Include="FoxmlException.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
       <AutoGen>True</AutoGen>
@@ -91,6 +94,8 @@
       <DependentUpon>Settings.settings</DependentUpon>
       <DesignTimeSharedInput>True</DesignTimeSharedInput>
     </Compile>
+    <Compile Include="OaiDc.vb" />
+    <Compile Include="RelsExt.vb" />
     <Compile Include="Service References\ApiA\Reference.vb">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
