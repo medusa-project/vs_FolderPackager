@@ -13,7 +13,7 @@ Imports Uiuc.Library.MetadataUtilities
 ''' Represents a collection record from the Medusa Collections Registry
 ''' </summary>
 ''' <remarks></remarks>
-Public Class CollectionRecord
+Public Class ModsCollectionRecord
   Const MAX_RETRY_COUNT = 5
 
   Private _xml As XmlDocument
