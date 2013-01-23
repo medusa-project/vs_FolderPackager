@@ -64,6 +64,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CheckDigit.vb" />
+    <Compile Include="IdManagementException.vb" />
     <Compile Include="IdManager.vb" />
     <Compile Include="Medusa.designer.vb">
       <AutoGen>True</AutoGen>
@@ -118,6 +119,14 @@
     <Service Include="{3259AA49-8AA1-44D3-9025-A0B520596A8C}" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\ContentDMPackager\HandleClient\HandleClient.vbproj">
+      <Project>{a8b9f624-4eea-47ba-9d45-60933cce623a}</Project>
+      <Name>HandleClient</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\ContentDMPackager\PREMIS\PREMIS.vbproj">
+      <Project>{164a9d55-4f5b-4b32-8d4c-90f044936fca}</Project>
+      <Name>PREMIS</Name>
+    </ProjectReference>
     <ProjectReference Include="..\Medusa\Medusa.vbproj">
       <Project>{ce8c3719-d278-4675-9da7-0df6665f66ca}</Project>
       <Name>Medusa</Name>

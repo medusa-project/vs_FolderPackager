@@ -8,5 +8,11 @@
         <elementListCompartment Id="05b4a11c-8a08-4cdb-a9c3-392869c9bbd7" absoluteBounds="3.7649999999999997, 2.585, 1.9700000000000002, 1.0185953776041665" name="DataPropertiesCompartment" titleTextColor="Black" itemTextColor="Black" />
       </nestedChildShapes>
     </classShape>
+    <classShape Id="1bbfada3-ab75-4b1d-8de6-6e29116e3415" absoluteBounds="3.75, 4.375, 2, 2.5401025390625">
+      <DataClassMoniker Name="/MedusaDataContext/HandleAction" />
+      <nestedChildShapes>
+        <elementListCompartment Id="8192b250-16ab-41a1-bbb5-888c89b15ce0" absoluteBounds="3.7649999999999997, 4.835, 1.9700000000000002, 1.9801025390625" name="DataPropertiesCompartment" titleTextColor="Black" itemTextColor="Black" />
+      </nestedChildShapes>
+    </classShape>
   </nestedChildShapes>
 </ordesignerObjectsDiagram>
