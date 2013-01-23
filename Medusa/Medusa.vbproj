@@ -64,6 +64,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="MedusaAppSettings.vb" />
+    <Compile Include="MedusaException.vb" />
+    <Compile Include="MedusaHelpers.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">
       <AutoGen>True</AutoGen>
@@ -98,6 +100,20 @@
       <CustomToolNamespace>My</CustomToolNamespace>
       <LastGenOutput>Settings.Designer.vb</LastGenOutput>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\ContentDMPackager\LDAP\LDAP.vbproj">
+      <Project>{e1f12ac9-d4fb-4c9c-bf1f-712b1fe2e667}</Project>
+      <Name>LDAP</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\ContentDMPackager\MetadataUtilities\MetadataUtilities.vbproj">
+      <Project>{d03d3545-eb61-43df-9736-8d0502f3be9d}</Project>
+      <Name>MetadataUtilities</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\ContentDMPackager\PREMIS\PREMIS.vbproj">
+      <Project>{164a9d55-4f5b-4b32-8d4c-90f044936fca}</Project>
+      <Name>PREMIS</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

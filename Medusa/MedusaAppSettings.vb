@@ -3,7 +3,7 @@ Imports System.IO
 Imports System.Collections.Specialized
 
 ''' <summary>
-''' Provides access to the Medusa properties from the various configuration files, such as app.config
+''' A singleton class provides access to the Medusa properties from the various configuration files, such as app.config
 ''' </summary>
 ''' <remarks></remarks>
 Public Class MedusaAppSettings
@@ -21,42 +21,45 @@ Public Class MedusaAppSettings
     Return _thisInst
   End Function
 
-  Private _handleMapFile As String = Nothing
-  Public Property HandleMapFile As String
+
+  Private _connectionString As String = Nothing
+  Public Property ConnectionString As String
     Get
-      If _handleMapFile Is Nothing Then
-        _handleMapFile = ConfigurationManager.AppSettings.Item("HandleMapFile")
+      If _connectionString Is Nothing Then
+        _connectionString = ConfigurationManager.ConnectionStrings.Item("Medusa_ConnectionString").ConnectionString
       End If
-      Return _handleMapFile
+      Return _connectionString
     End Get
     Set(value As String)
-      _handleMapFile = value
+      _connectionString = value
     End Set
   End Property
 
-  Public ReadOnly Property HandleMapFilePath As String
-    Get
-      Return Path.Combine(WorkingFolder, HandleMapFile)
-    End Get
-  End Property
 
-  Private _agentMapFile As String = Nothing
-  Public Property AgentMapFile As String
+  Private _agentsFolder As String = Nothing
+  Public Property AgentsFolder As String
     Get
-      If _agentMapFile Is Nothing Then
-        _agentMapFile = ConfigurationManager.AppSettings.Item("AgentMapFile")
+      If _agentsFolder Is Nothing Then
+        _agentsFolder = ConfigurationManager.AppSettings.Item("AgentsFolder")
       End If
-      Return _agentMapFile
+      Return _agentsFolder
     End Get
     Set(value As String)
-      _agentMapFile = value
+      _agentsFolder = value
     End Set
   End Property
 
-  Public ReadOnly Property AgentMapFilePath As String
+  Private _collectionsFolder As String = Nothing
+  Public Property CollectionsFolder As String
     Get
-      Return Path.Combine(WorkingFolder, AgentMapFile)
+      If _collectionsFolder Is Nothing Then
+        _collectionsFolder = ConfigurationManager.AppSettings.Item("CollectionsFolder")
+      End If
+      Return _collectionsFolder
     End Get
+    Set(value As String)
+      _collectionsFolder = value
+    End Set
   End Property
 
   Private _handlePrefix As String = Nothing
@@ -163,6 +166,19 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
+  Private _getCollectionJsonUrl As String = Nothing
+  Public Property GetCollectionJsonUrl As String
+    Get
+      If _getCollectionJsonUrl Is Nothing Then
+        _getCollectionJsonUrl = ConfigurationManager.AppSettings.Item("GetCollectionJsonUrl")
+      End If
+      Return _getCollectionJsonUrl
+    End Get
+    Set(value As String)
+      _getCollectionJsonUrl = value
+    End Set
+  End Property
+
   Private _getMarcUrl As String = Nothing
   Public Property GetMarcUrl As String
     Get
@@ -262,19 +278,16 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
-  Private _overwriteObjects As Boolean? = Nothing
-  Public Property OverwriteObjects As Boolean
+  Private _objectAlreadyExists As ObjectAlreadyExistsType? = Nothing
+  Public Property ObjectAlreadyExists As ObjectAlreadyExistsType
     Get
-      If _overwriteObjects Is Nothing Then
-        If String.IsNullOrWhiteSpace(ConfigurationManager.AppSettings.Item("OverwriteObjects")) Then
-          _overwriteObjects = False
-        End If
-        _overwriteObjects = Boolean.Parse(ConfigurationManager.AppSettings.Item("OverwriteObjects"))
+      If _objectAlreadyExists Is Nothing Then
+        _objectAlreadyExists = [Enum].Parse(GetType(ObjectAlreadyExistsType), ConfigurationManager.AppSettings.Item("ObjectAlreadyExists"), True)
       End If
-      Return _overwriteObjects
+      Return _objectAlreadyExists
     End Get
-    Set(value As Boolean)
-      _overwriteObjects = value
+    Set(value As ObjectAlreadyExistsType)
+      _objectAlreadyExists = value
     End Set
   End Property
 
@@ -685,4 +698,10 @@ Public Enum PackageModeType
   MOVE
   COPY
   HARDLINK
+End Enum
+
+Public Enum ObjectAlreadyExistsType
+  OVERWRITE
+  SKIP
+  THROW_ERROR
 End Enum
