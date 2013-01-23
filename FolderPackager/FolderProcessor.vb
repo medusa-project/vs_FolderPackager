@@ -11,14 +11,15 @@ Imports System.Security.Cryptography
 Imports System.Reflection
 Imports Uiuc.Library.Premis
 Imports Uiuc.Library.Ldap
-Imports Uiuc.Library.MetadataUtilities
-Imports Uiuc.Library.HandleClient
+Imports Uiuc.Library.IdManagement
 Imports Uiuc.Library.Fits
+Imports Uiuc.Library.Medusa
+Imports Uiuc.Library.MetadataUtilities
 Imports System.ComponentModel
 Imports System.Runtime.InteropServices
 
 ''' <summary>
-''' Process a single ContentDM record to create a Medusa Submission Package
+''' Process a file system folder to create a Medusa Submission Package
 ''' </summary>
 ''' <remarks></remarks>
 Public Class FolderProcessor
@@ -31,9 +32,11 @@ Public Class FolderProcessor
   Const IO_BUFFER_SIZE = &HF000
 
   Private pContainer As PremisContainer
+
   Private pUserAgent As PremisAgent
   Private pFitsAgent As PremisAgent
   Private pSoftAgent As PremisAgent
+
   Private pRepresentation As PremisObject
   Private collHandle As String
 
@@ -43,17 +46,16 @@ Public Class FolderProcessor
   Private baseSrcFolder As String
   Private fileNum As Integer = 0
 
-  Private IdMap As Dictionary(Of String, String)
-  Private HandleMap As Dictionary(Of Uri, KeyValuePair(Of Integer, String))
+  'Private HandleMap As Dictionary(Of Uri, KeyValuePair(Of Integer, String))
+
+  Private xslt As New Dictionary(Of String, XslCompiledTransform)
 
   Protected Sub New()
     'no public empty constructor is allowed
   End Sub
 
-  Sub New(ByVal collectionHandle As String, im As Dictionary(Of String, String), hm As Dictionary(Of Uri, KeyValuePair(Of Integer, String)))
+  Sub New(ByVal collectionHandle As String)
     collHandle = collectionHandle
-    IdMap = im
-    HandleMap = hm
     folderStack = New Stack(Of String)
     baseDestFolder = MedusaAppSettings.Settings.WorkingFolder
     baseSrcFolder = MedusaAppSettings.Settings.SourceFolder
@@ -112,30 +114,25 @@ Public Class FolderProcessor
 
       Console.Out.WriteLine(String.Format("Root Folder: {0}", sourceFolder))
 
-      Dim handle As String
-      If IdMap.ContainsKey(sourceFolder) Then
-        'use the already minted handle 
-        handle = IdMap.Item(sourceFolder)
-        If Not MetadataFunctions.ValidateHandle(handle) Then
-          Trace.TraceError("Invalid Handle: " & handle)
-          Trace.Flush()
-          Throw New PackagerException("Invalid Handle: " & handle)
-        End If
-      Else
-        'Create a PREMIS metadata for the record
-        handle = MetadataFunctions.GenerateLocalIdentifier
-        IdMap.Add(sourceFolder, handle)
+      Dim handle As String = IdManager.GetMedusaIdentifier(sourceFolder)
+
+      If Not IdManager.ValidateHandle(handle) Then
+        Trace.TraceError("Invalid Handle: " & handle)
+        Trace.Flush()
+        Throw New PackagerException("Invalid Handle: " & handle)
       End If
 
       Dim localId As String = handle
-      Dim idType As String = MetadataFunctions.GetIdType(handle)
+      Dim idType As String = IdManager.GetIdType(handle)
       If idType = "HANDLE" Then
-        localId = MetadataFunctions.GetLocalIdentifier(handle)
+        localId = IdManager.ParseLocalIdentifier(handle)
       End If
 
       pRepresentation = New PremisObject(idType, handle, PremisObjectCategory.Representation)
       pRepresentation.XmlId = String.Format("folder_{0}", fileNum)
 
+
+      Dim skipFolder As Boolean = False
       If objectFolderLevel = 1 Then 'this is just the data folder, need to create another subfolder for this object
         destPath = Path.Combine(destPath, pRepresentation.GetDefaultFileName("", ""))
         Directory.CreateDirectory(destPath)
@@ -145,10 +142,15 @@ Public Class FolderProcessor
         Try
           My.Computer.FileSystem.RenameDirectory(destPath, pRepresentation.GetDefaultFileName("", ""))
         Catch ex As IOException
-          If MedusaAppSettings.Settings.OverwriteObjects = True Then
+          If MedusaAppSettings.Settings.ObjectAlreadyExists = ObjectAlreadyExistsType.OVERWRITE Then
             'Dest folder already exists, so just delete the orig folder
             My.Computer.FileSystem.DeleteDirectory(destPath, FileIO.DeleteDirectoryOption.ThrowIfDirectoryNonEmpty)
-            Trace.TraceWarning("Folder '{1}' already exists.  Original folder '{0}' will be deleted.", destPath, pRepresentation.GetDefaultFileName("", ""))
+            Trace.TraceWarning("Folder '{1}' already exists.  Contents will be overwritten.", destPath, pRepresentation.GetDefaultFileName("", ""))
+          ElseIf MedusaAppSettings.Settings.ObjectAlreadyExists = ObjectAlreadyExistsType.SKIP Then
+            'Dest folder already exists, so delete and skip this folder
+            skipFolder = True
+            My.Computer.FileSystem.DeleteDirectory(destPath, FileIO.DeleteDirectoryOption.ThrowIfDirectoryNonEmpty)
+            Trace.TraceWarning("Folder '{1}' already exists.  Folder processing will be skipped.", destPath, pRepresentation.GetDefaultFileName("", ""))
           Else
             Trace.TraceError("Folder '{1}' already exists.", destPath, pRepresentation.GetDefaultFileName("", ""))
             Trace.Flush()
@@ -160,99 +162,104 @@ Public Class FolderProcessor
         folderStack.Push(destPath)
       End If
 
+      If skipFolder = False Then
+        pContainer = New PremisContainer(pRepresentation)
+        pContainer.IDPrefix = handle & MedusaAppSettings.Settings.HandleLocalIdSeparator
+        Dim presLvl As New PremisPreservationLevel("BIT_LEVEL", Now)
+        presLvl.PreservationLevelRationale.Add("Uncategorized file system capture")
+        pRepresentation.PreservationLevels.Add(presLvl)
+        pRepresentation.OriginalName = sourceFolder
 
-      pContainer = New PremisContainer(pRepresentation)
-      pContainer.IDPrefix = handle & MedusaAppSettings.Settings.HandleLocalIdSeparator
-      Dim presLvl As New PremisPreservationLevel("BIT_LEVEL", Now)
-      presLvl.PreservationLevelRationale.Add("Uncategorized file system capture")
-      pRepresentation.PreservationLevels.Add(presLvl)
-      pRepresentation.OriginalName = sourceFolder
+        pUserAgent = MedusaHelpers.GetPremisAgent
+        pUserAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pUserAgent.AgentIdentifiers.First.IdentifierValue))
+        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+          Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", "")))
+          pUserAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", ""), pUserAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+        End If
 
-      pUserAgent = UIUCLDAPUser.GetPremisAgent
-      pSoftAgent = PremisAgent.GetCurrentSoftwareAgent("LOCAL", pContainer.NextID)
+        pSoftAgent = PremisAgent.GetCurrentSoftwareAgent()
+        pSoftAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pSoftAgent.AgentIdentifiers.First.IdentifierValue))
+        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+          Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", "")))
+          pSoftAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", ""), pSoftAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+        End If
 
-      'register a handle for the root object 
-      If MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_AND_FILES Or MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_ONLY Then
-        Dim regHandle As String = RegisterFileHandle(destPath, pRepresentation)
-      End If
+        'register a handle for the root object 
+        If MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_AND_FILES Or MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_ONLY Then
+          Dim regHandle As String = RegisterFileHandle(destPath, pRepresentation)
+        End If
 
-      Dim files As List(Of String) = Directory.EnumerateFiles(sourceFolder).ToList
-      For Each fl In files
-        If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OmitFilesRegex) OrElse Not Regex.IsMatch(fl, MedusaAppSettings.Settings.OmitFilesRegex, RegexOptions.IgnoreCase) Then
-          Dim fat = File.GetAttributes(fl)
-          If Not (fat.HasFlag(FileAttributes.System) Or fat.HasFlag(FileAttributes.Hidden)) Then
-            Dim relatType As String = MedusaHelpers.GetMedusaRelationshipType(fl, "BASIC_FILE_ASSET")
-            Dim relatSubtype As String = MedusaHelpers.GetMedusaRelationshipSubtype(fl, relatType, "UNSPECIFIED")
-            Dim capfile As String = CaptureFile(fl, destPath, pRepresentation, relatType, relatSubtype)
+        Dim files As List(Of String) = Directory.EnumerateFiles(sourceFolder).ToList
+        For Each fl In files
+          If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OmitFilesRegex) OrElse Not Regex.IsMatch(fl, MedusaAppSettings.Settings.OmitFilesRegex, RegexOptions.IgnoreCase) Then
+            Dim fat = File.GetAttributes(fl)
+            If Not (fat.HasFlag(FileAttributes.System) Or fat.HasFlag(FileAttributes.Hidden)) Then
+              Dim relatType As String = MedusaHelpers.GetMedusaRelationshipType(fl, "BASIC_FILE_ASSET")
+              Dim relatSubtype As String = MedusaHelpers.GetMedusaRelationshipSubtype(fl, relatType, "UNSPECIFIED")
+              Dim capfile As String = CaptureFile(fl, destPath, pRepresentation, relatType, relatSubtype)
+            End If
+          Else
+            Trace.TraceWarning(String.Format("Skipping file '{0}'.", fl))
           End If
-        Else
-          Trace.TraceWarning(String.Format("Skipping file '{0}'.", fl))
-        End If
-      Next
+        Next
 
-      Dim folders As List(Of String) = Directory.EnumerateDirectories(sourceFolder).ToList
-      For Each fld In folders
-        ProcessFolder(fld, destPath, pRepresentation)
-      Next
+        Dim folders As List(Of String) = Directory.EnumerateDirectories(sourceFolder).ToList
+        For Each fld In folders
+          ProcessFolder(fld, destPath, pRepresentation)
+        Next
 
-      If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRights) Then
-        Dim pRgtStmt As New PremisRightsStatement("LOCAL", pContainer.NextID, MedusaAppSettings.Settings.PremisDisseminationRightsBasis)
-        pRgtStmt.RightsGranted.Add(New PremisRightsGranted(MedusaAppSettings.Settings.PremisDisseminationRights))
-        pRgtStmt.LinkToObject(pRepresentation)
-        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions) Then
-          pRgtStmt.RightsGranted.FirstOrDefault.Restrictions.Add(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions)
+        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRights) Then
+          Dim pRgtStmt As New PremisRightsStatement("LOCAL", pContainer.NextID, MedusaAppSettings.Settings.PremisDisseminationRightsBasis)
+          pRgtStmt.RightsGranted.Add(New PremisRightsGranted(MedusaAppSettings.Settings.PremisDisseminationRights))
+          pRgtStmt.LinkToObject(pRepresentation)
+          If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions) Then
+            pRgtStmt.RightsGranted.FirstOrDefault.Restrictions.Add(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions)
+          End If
+          If MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.COPYRIGHT And
+            Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus) Then
+            Dim cpyRt As New PremisCopyrightInformation(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus, "United States")
+            pRgtStmt.CopyrightInformation = cpyRt
+          End If
+          Dim pRt As New PremisRights(pRgtStmt)
+          pContainer.Rights.Add(pRt)
         End If
-        If MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.COPYRIGHT And
-          Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus) Then
-          Dim cpyRt As New PremisCopyrightInformation(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus, "United States")
-          pRgtStmt.CopyrightInformation = cpyRt
+
+        idType = IdManager.GetIdType(collHandle)
+
+        pRepresentation.RelateToObject("COLLECTION", "IS_MEMBER_OF", idType, collHandle)
+
+        pContainer.Agents.Add(pUserAgent)
+
+        pContainer.Agents.Add(pSoftAgent)
+
+        If pFitsAgent IsNot Nothing Then
+          pFitsAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pFitsAgent.AgentIdentifiers.First.IdentifierValue))
+          If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+            Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pFitsAgent.GetDefaultFileName("", "")))
+            pFitsAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pFitsAgent.GetDefaultFileName("", ""), pFitsAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+          End If
+          pContainer.Agents.Add(pFitsAgent)
         End If
-        Dim pRt As New PremisRights(pRgtStmt)
-        pContainer.Rights.Add(pRt)
+
+        Dim pEvt As New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
+        'include details about packager program here
+        pEvt.EventDetail = String.Format("SIP created from a file system folder: '{7}'.  Program: {0} {1} [{2}], Computer: {3}, {4} V{5}, {6}",
+                                         My.Application.Info.Title, My.Application.Info.Version, My.Application.Info.CompanyName, My.Computer.Name, My.Computer.Info.OSFullName.Trim,
+                                         My.Computer.Info.OSVersion, My.Application.UICulture.EnglishName, sourceFolder)
+        pEvt.LinkToAgent(pUserAgent)
+        pEvt.LinkToAgent(pSoftAgent)
+        pEvt.LinkToObject(pRepresentation)
+        pContainer.Events.Add(pEvt)
+
+        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+          pContainer.PersistedEntityTypes = PremisEntityTypes.AllExceptAgents
+        End If
+
+        MedusaHelpers.SavePremisContainer(pContainer, destPath)
       End If
-
-      idType = MetadataFunctions.GetIdType(collHandle)
-
-      pRepresentation.RelateToObject("COLLECTION", "IS_MEMBER_OF", idType, collHandle)
-
-      pUserAgent.AgentIdentifiers.Insert(0, pContainer.NextLocalIdentifier)
-      pContainer.Agents.Add(pUserAgent)
-      If pFitsAgent IsNot Nothing Then
-        pContainer.Agents.Add(pFitsAgent)
-      End If
-
-      Dim pEvt As New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
-      'include details about packager program here
-      pEvt.EventDetail = String.Format("SIP created from a file system folder: '{7}'.  Program: {0} {1} [{2}], Computer: {3}, {4} V{5}, {6}",
-                                       My.Application.Info.Title, My.Application.Info.Version, My.Application.Info.CompanyName, My.Computer.Name, My.Computer.Info.OSFullName.Trim,
-                                       My.Computer.Info.OSVersion, My.Application.UICulture.EnglishName, sourceFolder)
-      pEvt.LinkToAgent(pUserAgent)
-      pEvt.LinkToAgent(pSoftAgent)
-      pEvt.LinkToObject(pRepresentation)
-      pContainer.Events.Add(pEvt)
-
-      Select Case MedusaAppSettings.Settings.SaveFilesAs
-        Case SaveFileAsType.ONE
-          'save one big premis file for the whole object
-          pContainer.SaveXML(Path.Combine(destPath, pContainer.Objects.First.GetDefaultFileName("premis_", "xml")))
-        Case SaveFileAsType.MULTIPLE
-          'save a separate file for each premis entity
-          pContainer.SaveEachXML(destPath)
-        Case SaveFileAsType.REPRESENTATIONS
-          'create directory structure and save a separate premis file for each premis representation object and associated entities, 
-          'also save a premis file for each file object (not metadata)
-          'TODO:  This function has not been tested for the folder packager, so should notbe used yet
-          pContainer.SavePartitionedXML(destPath, True)
-        Case SaveFileAsType.MEDUSA, SaveFileAsType.MEDUSA_MULTIPLE
-          'create directory structure and save a separate premis file for each fedora object as defined for our medusa content model
-          'pContainer.SaveXML(Path.Combine(recPath, pContainer.Objects.First.GetDefaultFileName("test_premis_", "xml")))
-          MedusaHelpers.SavePartitionedXML(pContainer, destPath, True)
-        Case Else
-          'save one big premis file for the whole object
-          pContainer.SaveXML(Path.Combine(destPath, pContainer.Objects.First.GetDefaultFileName("premis_", "xml")))
-      End Select
 
     ElseIf folderStack.Count > objectFolderLevel Then
+
       'this folder represents the components of an object, all its files and subfolders are processed
 
       Console.Out.WriteLine(String.Format("Subfolder: {0}", sourceFolder))
@@ -261,14 +268,19 @@ Public Class FolderProcessor
       Dim pFolderObj As New PremisObject("LOCAL", pContainer.NextID, PremisObjectCategory.Representation)
       pFolderObj.XmlId = String.Format("folder_{0}", fileNum)
 
+      Dim skipFolder As Boolean = False
       'Rename the folder at this point to use the local suffix index value
       Try
         My.Computer.FileSystem.RenameDirectory(destPath, pFolderObj.GetDefaultFileNameIndex)
       Catch ex As IOException
-        If MedusaAppSettings.Settings.OverwriteObjects = True Then
+        If MedusaAppSettings.Settings.ObjectAlreadyExists = ObjectAlreadyExistsType.OVERWRITE Then
           'Dest folder already exists, so just delete the orig folder
           My.Computer.FileSystem.DeleteDirectory(destPath, FileIO.DeleteDirectoryOption.ThrowIfDirectoryNonEmpty)
-          Trace.TraceWarning("Folder '{1}' already exists.  Original folder '{0}' will be deleted.", destPath, pFolderObj.GetDefaultFileName("", ""))
+          Trace.TraceWarning("Folder '{1}' already exists.  Contents will be overwritten.", destPath, pFolderObj.GetDefaultFileName("", ""))
+        ElseIf MedusaAppSettings.Settings.ObjectAlreadyExists = ObjectAlreadyExistsType.SKIP Then
+          'Dest folder already exists, so just skip the orig folder
+          skipFolder = True
+          Trace.TraceWarning("Folder '{1}' already exists.  Folder processing will be skipped.", destPath, pFolderObj.GetDefaultFileName("", ""))
         Else
           Trace.TraceError("Folder '{1}' already exists.", destPath, pFolderObj.GetDefaultFileName("", ""))
           Trace.Flush()
@@ -279,36 +291,41 @@ Public Class FolderProcessor
       folderStack.Pop()
       folderStack.Push(destPath)
 
-      'add a folder name identifier which is the path relative to the root folder for this object
-      Dim pId As New PremisIdentifier("FOLDERNAME", GetRelativePathTo(destPath))
-      pFolderObj.ObjectIdentifiers.Add(pId)
-      pFolderObj.OriginalName = sourceFolder
+      If skipFolder = False Then
+        'add a folder name identifier which is the path relative to the root folder for this object
+        Dim pId As New PremisIdentifier("FOLDERNAME", GetRelativePathTo(destPath))
+        pFolderObj.ObjectIdentifiers.Add(pId)
+        pFolderObj.OriginalName = sourceFolder
 
 
-      pFolderObj.RelateToObject("BASIC_COMPOUND_ASSET", "PARENT", parentObject)
-      parentObject.RelateToObject("BASIC_COMPOUND_ASSET", "CHILD", pFolderObj)
+        pFolderObj.RelateToObject("BASIC_COMPOUND_ASSET", "PARENT", parentObject)
+        parentObject.RelateToObject("BASIC_COMPOUND_ASSET", "CHILD", pFolderObj)
 
-      pContainer.Objects.Add(pFolderObj)
+        pContainer.Objects.Add(pFolderObj)
 
-      Dim files As List(Of String) = Directory.EnumerateFiles(sourceFolder).ToList
-      For Each fl In files
-        If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OmitFilesRegex) OrElse Not Regex.IsMatch(fl, MedusaAppSettings.Settings.OmitFilesRegex, RegexOptions.IgnoreCase) Then
-          Dim fat = File.GetAttributes(fl)
-          If Not (fat.HasFlag(FileAttributes.System) Or fat.HasFlag(FileAttributes.Hidden)) Then
-            Dim relatType As String = MedusaHelpers.GetMedusaRelationshipType(fl, "BASIC_FILE_ASSET")
-            Dim relatSubtype As String = MedusaHelpers.GetMedusaRelationshipSubtype(fl, relatType, "UNSPECIFIED")
-            Dim capfile As String = CaptureFile(fl, destPath, pFolderObj, relatType, relatSubtype)
+        Dim files As List(Of String) = Directory.EnumerateFiles(sourceFolder).ToList
+        For Each fl In files
+          If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OmitFilesRegex) OrElse Not Regex.IsMatch(fl, MedusaAppSettings.Settings.OmitFilesRegex, RegexOptions.IgnoreCase) Then
+            Dim fat = File.GetAttributes(fl)
+            If Not (fat.HasFlag(FileAttributes.System) Or fat.HasFlag(FileAttributes.Hidden)) Then
+              Dim relatType As String = MedusaHelpers.GetMedusaRelationshipType(fl, "BASIC_FILE_ASSET")
+              Dim relatSubtype As String = MedusaHelpers.GetMedusaRelationshipSubtype(fl, relatType, "UNSPECIFIED")
+              Dim capfile As String = CaptureFile(fl, destPath, pFolderObj, relatType, relatSubtype)
+            End If
+          Else
+            Trace.TraceWarning(String.Format("Skipping file '{0}'.", fl))
           End If
-        Else
-          Trace.TraceWarning(String.Format("Skipping file '{0}'.", fl))
-        End If
-      Next
+        Next
 
-      Dim folders As List(Of String) = Directory.EnumerateDirectories(sourceFolder).ToList
-      For Each fld In folders
-        ProcessFolder(fld, destPath, pFolderObj)
-      Next
+        Dim folders As List(Of String) = Directory.EnumerateDirectories(sourceFolder).ToList
+        For Each fld In folders
+          ProcessFolder(fld, destPath, pFolderObj)
+        Next
+
+      End If
+
     End If
+
 
     folderStack.Pop()
   End Sub
@@ -351,7 +368,7 @@ Public Class FolderProcessor
       pSigProps = fts.GetPremisSignificantProperties
 
       If pFitsAgent Is Nothing Then
-        pFitsAgent = fts.GetPremisAgent(pContainer.NextLocalIdentifier)
+        pFitsAgent = fts.GetPremisAgent()
       End If
 
       pEvtFits.LinkToAgent(pFitsAgent)
@@ -400,14 +417,33 @@ Public Class FolderProcessor
       pObj.ObjectIdentifiers.Insert(0, pContainer.NextLocalIdentifier)
       pObj.XmlId = String.Format("file_{0}", fileNum)
 
+
+      'TODO: This rename code is a mess!  The OVERWRITE and SKIP checks should be moved up so as to avoid recapturing a file that already exists
+      'or this code should just be eliminated so as to always overwrite files.  In actuality if the setting is SKIP, this will never be reached
+      'because the folder will have already been skipped.
+
       'rename the file to use the uuid and the relative path
       Dim newFName As String = pObj.GetDefaultFileName(MedusaHelpers.GetFileNamePrefix(relat, subRelat), Path.GetExtension(filename))
       Dim newFPath As String = Path.Combine(recpath, newFName)
+      Dim capPath As String = Path.Combine(recpath, capFile)
       'If file already exists -- delete it and log a warning
       If File.Exists(newFPath) Then
-        If MedusaAppSettings.Settings.OverwriteObjects = True Then
+        If MedusaAppSettings.Settings.ObjectAlreadyExists = ObjectAlreadyExistsType.OVERWRITE Then
           File.Delete(newFPath)
           Trace.TraceWarning("File '{0}' already exists.  It will be deleted and replaced with the new file of same name.", newFPath)
+        ElseIf MedusaAppSettings.Settings.ObjectAlreadyExists = ObjectAlreadyExistsType.SKIP Then
+          Dim newFInfo As New FileInfo(newFPath)
+          Dim capFInfo As New FileInfo(capPath)
+
+          If newFInfo.Length = capFInfo.Length And newFInfo.LastWriteTime = capFInfo.LastWriteTime Then
+            'if the captured file and the existing file are the same size and date just skip this file and delete the captured file
+            File.Delete(capPath)
+            Trace.TraceWarning("File '{0}' already exists.  It will be skipped.", newFPath)
+          Else
+            'overwrite the existing file because it is different than the captured file
+            File.Delete(newFPath)
+            Trace.TraceWarning("File '{0}' already exists but is different than the captured file.  It will be deleted and replaced with captured file.", newFPath)
+          End If
         Else
           Trace.TraceError("File '{0}' already exists.", newFPath)
           Trace.Flush()
@@ -415,7 +451,7 @@ Public Class FolderProcessor
         End If
       End If
 
-      Rename(Path.Combine(recpath, capFile), newFPath)
+      My.Computer.FileSystem.MoveFile(capPath, newFPath)
       pObj.GetFilenameIdentifier.IdentifierValue = GetRelativePathTo(newFPath)
 
       pObj.LinkToEvent(pEvt)
@@ -435,8 +471,6 @@ Public Class FolderProcessor
       If (relat = "METADATA" And subRelat = "MARC" And Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.MarcToModsXslt)) Or _
         (relat = "METADATA" And subRelat = "DC_RDF" And Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.DcRdfToModsXslt)) Then
 
-        Dim xslt = New XslCompiledTransform()
-
         Dim xsltFile As String = ""
         If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.MarcToModsXslt) Then
           xsltFile = MedusaAppSettings.Settings.MarcToModsXslt
@@ -444,12 +478,17 @@ Public Class FolderProcessor
           xsltFile = MedusaAppSettings.Settings.DcRdfToModsXslt
         End If
 
-        xslt.Load(xsltFile)
+        If xslt.ContainsKey(subRelat) = False Then
+          xslt.Add(subRelat, New XslCompiledTransform())
+          xslt.Item(subRelat).Load(xsltFile)
+        End If
+
+
         Dim modsObj = New PremisObject("LOCAL", pContainer.NextID, PremisObjectCategory.File)
         Dim modsFile As String = Path.Combine(Path.GetDirectoryName(ret), modsObj.GetDefaultFileName("mods_", "xml"))
 
         Try
-          xslt.Transform(ret, modsFile)
+          xslt.Item(subRelat).Transform(ret, modsFile)
 
         Catch ex As Exception
           modsObj = Nothing
@@ -475,7 +514,7 @@ Public Class FolderProcessor
 
           modsObj.ObjectIdentifiers.Add(New PremisIdentifier("FILENAME", modsFile))
 
-          Dim modsChar = PremisObjectCharacteristics.CharacterizeFile(modsFile, "text/xml")
+          Dim modsChar = MedusaHelpers.CharacterizeFile(modsFile, "text/xml")
           modsObj.ObjectCharacteristics.Add(modsChar)
           modsObj.PreservationLevels.Add(New PremisPreservationLevel("DERIVATIVE_METADATA_FILE"))
 
@@ -511,60 +550,13 @@ Public Class FolderProcessor
   ''' <param name="newFPath"></param>
   ''' <param name="pObj"></param>
   ''' <returns></returns>
-  ''' <remarks>This function requires the pContainer and pCurrentAgent be instantiated</remarks>
+  ''' <remarks>This function requires the pContainer and pUserAgent be instantiated</remarks>
   Private Function RegisterFileHandle(newFPath As String, pObj As PremisObject) As String
-    Dim urib As New UriBuilder
-    urib.Scheme = "file"
-    urib.Path = newFPath
-
-    'register a handle for the URI if not already done
-    Dim handle As String = ""
-    Dim local_id As String
-    If HandleMap.ContainsKey(urib.Uri) Then
-      'use the already registered handle 
-      handle = HandleMap.Item(urib.Uri).Value
-      local_id = MetadataFunctions.GetLocalIdentifier(handle)
-    Else
-      local_id = pObj.LocalIdentifierValue
+    If pContainer Is Nothing Or pUserAgent Is Nothing Or pSoftAgent Is Nothing Then
+      Throw New PackagerException("Object is not in state where a handle can be registered.")
     End If
 
-    'Register a new handle for the file, if needed
-    Try
-      Dim hc As HandleClient.HandleClient = HandleClient.HandleClient.CreateUpdateHandle(local_id, urib.Uri.ToString, pUserAgent.EmailIdentifierValue, _
-                                                                                      String.Format("Collection: {0}", MedusaAppSettings.Settings.CollectionName))
-      handle = hc.handle_value
-      If Not MetadataFunctions.ValidateHandle(handle) Then
-        Trace.TraceError("Invalid Handle: " & handle)
-        Trace.Flush()
-        Throw New PackagerException("Invalid Handle: " & handle)
-      End If
-
-      If Not HandleMap.ContainsKey(urib.Uri) Then HandleMap.Add(urib.Uri, New KeyValuePair(Of Integer, String)(fileNum, handle))
-      pObj.ObjectIdentifiers.Add(New PremisIdentifier("HANDLE", handle))
-
-      Dim hEvt As PremisEvent = hc.GetPremisEvent(New PremisIdentifier("LOCAL", pContainer.NextID))
-      hEvt.LinkToObject(pObj)
-      hEvt.LinkToAgent(pUserAgent)
-      hEvt.LinkToAgent(pSoftAgent)
-
-      pContainer.Events.Add(hEvt)
-
-    Catch ex As Exception
-      Trace.TraceError("Handle: {0}", ex.Message)
-      Trace.Flush()
-      MedusaHelpers.EmailException(ex)
-
-      Dim hEvt As New PremisEvent("LOCAL", pContainer.NextID, "HANDLE_CREATION")
-      Dim hEvtOut As New PremisEventOutcomeInformation("FAILED")
-      hEvtOut.EventOutcomeDetails.Add(New PremisEventOutcomeDetail(ex.Message))
-      hEvt.EventOutcomeInformation.Add(hEvtOut)
-      hEvt.LinkToObject(pObj)
-      hEvt.LinkToAgent(pUserAgent)
-      hEvt.LinkToAgent(pSoftAgent)
-
-      pContainer.Events.Add(hEvt)
-
-    End Try
+    Dim handle = IdManager.RegisterFileHandle(newFPath, pObj, pContainer, pUserAgent, pSoftAgent)
 
     Return handle
 

@@ -4,13 +4,12 @@ Imports System.Text.RegularExpressions
 Imports System.Configuration
 Imports System.Text
 Imports Uiuc.Library.Premis
-Imports Uiuc.Library.MetadataUtilities
-Imports Uiuc.Library.CollectionsRegistry
+Imports Uiuc.Library.IdManagement
+Imports Uiuc.Library.Medusa
 Imports Uiuc.Library.Ldap
+Imports Uiuc.Library.CollectionsRegistry
 
 Public Class Processor
-  Private _idMap As New Dictionary(Of String, String)
-  Private _handleMap As New Dictionary(Of Uri, KeyValuePair(Of Integer, String))
 
   ''' <summary>
   ''' Process the source folder with all files belonging to the given collection
@@ -22,65 +21,12 @@ Public Class Processor
 
     Dim folderName As String = MedusaAppSettings.Settings.SourceFolder
 
-    If File.Exists(MedusaAppSettings.Settings.IdMapFilePath) Then
-      LoadIdMap(MedusaAppSettings.Settings.IdMapFilePath)
-    End If
-
-    If File.Exists(MedusaAppSettings.Settings.HandleMapFilePath) Then
-      LoadHandleMap(MedusaAppSettings.Settings.HandleMapFilePath)
-    End If
-
-    Dim processor As New FolderProcessor(collHandle, _idMap, _handleMap)
+    Dim processor As New FolderProcessor(collHandle)
     processor.ProcessFolder(folderName)
 
-    SaveIdMap(MedusaAppSettings.Settings.IdMapFilePath)
-    SaveHandleMap(MedusaAppSettings.Settings.HandleMapFilePath)
 
   End Sub
 
-  Private Sub SaveIdMap(fileName As String)
-    'If Not File.Exists(fileName) Then
-    Dim fs As New StreamWriter(fileName)
-    For Each k In _idMap
-      fs.WriteLine(String.Format("{0},{1}", k.Key, k.Value))
-    Next
-    fs.Close()
-    'End If
-  End Sub
-
-  Private Sub SaveHandleMap(fileName As String)
-    'If Not File.Exists(fileName) Then
-    Dim fs As New StreamWriter(fileName)
-    For Each k In _handleMap
-      fs.WriteLine(String.Format("{0},{1},{2}", k.Value.Key, k.Key, k.Value.Value))
-    Next
-    fs.Close()
-    'End If
-  End Sub
-
-  Private Sub LoadIdMap(filename As String)
-    Dim fs As New StreamReader(filename)
-    Do Until fs.EndOfStream
-      Dim ln As String = fs.ReadLine
-      If Not ln.StartsWith("#") Then
-        Dim parts() As String = ln.Split(",", 2, StringSplitOptions.RemoveEmptyEntries)
-        _idMap.Add(parts(0), parts(1))
-      End If
-    Loop
-    fs.Close()
-  End Sub
-
-  Private Sub LoadHandleMap(filename As String)
-    Dim fs As New StreamReader(filename)
-    Do Until fs.EndOfStream
-      Dim ln As String = fs.ReadLine
-      If Not ln.StartsWith("#") Then
-        Dim parts() As String = ln.Split(",", 3, StringSplitOptions.RemoveEmptyEntries)
-        _handleMap.Add(New Uri(parts(1)), New KeyValuePair(Of Integer, String)(parts(0), parts(2)))
-      End If
-    Loop
-    fs.Close()
-  End Sub
 
   ''' <summary>
   ''' Create a collection record package for the exported ContentDM collection.
@@ -95,13 +41,13 @@ Public Class Processor
   Public Function ProcessCollection() As String
     'TODO:  Use the collection registry ID to capture the collection mods record
 
-    Directory.CreateDirectory("collection")
+    Directory.CreateDirectory(MedusaAppSettings.Settings.CollectionsFolder)
 
     Dim collId As String = MedusaAppSettings.Settings.CollectionId
 
-    Dim collrec As CollectionRecord = Nothing
+    Dim collrec As ModsCollectionRecord = Nothing
     If Not String.IsNullOrWhiteSpace(collId) Then
-      collrec = New CollectionRecord(collId, "collection")
+      collrec = New ModsCollectionRecord(collId, MedusaAppSettings.Settings.CollectionsFolder)
     End If
 
     Dim collHandle As String = ""
@@ -116,7 +62,7 @@ Public Class Processor
       Dim pth As String = MedusaAppSettings.Settings.CollectionDescriptionPath
       Dim collDescr As String = File.ReadAllText(pth)
 
-      Dim newFPath As String = Path.Combine("collection", "mods.xml")
+      Dim newFPath As String = Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, "mods.xml")
       'create mods record for the collection
       Dim xmlwr As XmlWriter = XmlWriter.Create(newFPath, New XmlWriterSettings With {.Indent = True, .Encoding = Encoding.UTF8, .OmitXmlDeclaration = True})
       xmlwr.WriteStartElement("mods", "http://www.loc.gov/mods/v3")
@@ -143,11 +89,11 @@ Public Class Processor
 
     'Create a PREMIS metadata for the collection
     If String.IsNullOrWhiteSpace(collHandle) Then
-      collHandle = MetadataFunctions.GenerateLocalIdentifier
+      collHandle = IdManager.GenerateLocalIdentifier
     End If
-    Dim idType As String = MetadataFunctions.GetIdType(collHandle)
+    Dim idType As String = IdManager.GetIdType(collHandle)
 
-    If MetadataFunctions.ValidateHandle(collHandle) = False Then
+    If IdManager.ValidateHandle(collHandle) = False Then
       Trace.TraceError("Invalid Handle: " & collHandle)
       Trace.Flush()
       Throw New PackagerException("Invalid Handle: " & collHandle)
@@ -161,10 +107,22 @@ Public Class Processor
     Dim pContainer As PremisContainer = New PremisContainer(pObj)
     pContainer.IDPrefix = collHandle & MedusaAppSettings.Settings.HandleLocalIdSeparator
 
-    Dim pUserAgent As PremisAgent = UIUCLDAPUser.GetPremisAgent
-    Dim pSoftAgent As PremisAgent = PremisAgent.GetCurrentSoftwareAgent("LOCAL", pContainer.NextID)
-    pUserAgent.AgentIdentifiers.Insert(0, pContainer.NextLocalIdentifier)
+    Dim pUserAgent As PremisAgent = MedusaHelpers.GetPremisAgent
+    pUserAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pUserAgent.AgentIdentifiers.First.IdentifierValue))
+    If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+      Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", "")))
+      pUserAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", ""), pUserAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+    End If
+
+    Dim pSoftAgent As PremisAgent = PremisAgent.GetCurrentSoftwareAgent()
+    pSoftAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pSoftAgent.AgentIdentifiers.First.IdentifierValue))
+    If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+      Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", "")))
+      pSoftAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", ""), pSoftAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+    End If
+
     pContainer.Agents.Add(pUserAgent)
+    pContainer.Agents.Add(pSoftAgent)
 
     Dim pEvt As New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
     pEvt.LinkToAgent(pUserAgent)
@@ -179,12 +137,12 @@ Public Class Processor
     End If
     pContainer.Objects.Add(pObj2)
 
-    'rename mods file to use uuid
+    'rename mods file to use uuid 
     Dim newFName As String = pObj2.GetDefaultFileName("mods_", ".xml")
-    If File.Exists(Path.Combine("collection", newFName)) Then
-      File.Delete(Path.Combine("collection", newFName))
+    If File.Exists(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName)) Then
+      File.Delete(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName))
     End If
-    Rename(Path.Combine("collection", "mods.xml"), Path.Combine("collection", newFName))
+    My.Computer.FileSystem.MoveFile(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, "mods.xml"), Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName))
     pObj2.GetFilenameIdentifier.IdentifierValue = newFName
 
     Dim pEvt2 As PremisEvent
@@ -220,9 +178,15 @@ Public Class Processor
       pContainer.Rights.Add(pRt)
     End If
 
-    pContainer.SaveXML(Path.Combine("collection", pObj.GetDefaultFileName("premis_object_", "xml")))
+    If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+      pContainer.PersistedEntityTypes = PremisEntityTypes.AllExceptAgents
+    End If
 
-    'pContainer.SaveEachXML(Path.Combine("collection", "_").TrimEnd("_"))
+    MedusaHelpers.SavePremisContainer(pContainer, Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", "")))
+
+    'pContainer.SaveXML(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("premis_object_", "xml")))
+
+    'pContainer.SaveEachXML(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, "_").TrimEnd("_"))
 
 
     Return collHandle

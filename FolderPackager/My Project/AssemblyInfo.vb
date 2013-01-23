@@ -9,10 +9,10 @@ Imports System.Runtime.InteropServices
 ' Review the values of the assembly attributes
 
 <Assembly: AssemblyTitle("FolderPackager")> 
-<Assembly: AssemblyDescription("")> 
-<Assembly: AssemblyCompany("Microsoft")> 
-<Assembly: AssemblyProduct("FolderPackager")> 
-<Assembly: AssemblyCopyright("Copyright © Microsoft 2012")> 
+<Assembly: AssemblyDescription("Package a folder of files and subfolders into a PREMIS-based structure suitable for ingest into the Medusa repository.")> 
+<Assembly: AssemblyCompany("Library, University of Illinois at Urbana-Champaign")> 
+<Assembly: AssemblyProduct("Medusa Folder Packager")> 
+<Assembly: AssemblyCopyright("Copyright © 2012 University of Illinois Board of Trustees")> 
 <Assembly: AssemblyTrademark("")> 
 
 <Assembly: ComVisible(False)>

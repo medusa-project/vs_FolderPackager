@@ -3,7 +3,7 @@ Imports System.Configuration
 Imports System.Security
 Imports System.Net
 Imports Uiuc.Library.Ldap
-Imports Uiuc.Library.MetadataUtilities
+Imports Uiuc.Library.Medusa
 
 'TODO:  Provide an in-place packager option to rearrange and package files into different location on the same drive
 '       Add PackageMode paramater: COPY or MOVE or HARDLINK
@@ -20,7 +20,7 @@ Imports Uiuc.Library.MetadataUtilities
 Module Packager
 
   ''' <summary>
-  ''' "Remember the Maine!"
+  ''' "Remember the Main!"
   ''' </summary>
   ''' <remarks></remarks>
   Sub Main()
@@ -31,6 +31,7 @@ Module Packager
     'need to deal with SSL
     ServicePointManager.ServerCertificateValidationCallback = AddressOf ValidateCert
     ServicePointManager.DefaultConnectionLimit = 10
+
 
 
     'set current directory to working folder; this is the destination folder for the package

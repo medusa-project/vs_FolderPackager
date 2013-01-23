@@ -13,8 +13,9 @@
     <AssemblyName>FolderPackagerGui</AssemblyName>
     <FileAlignment>512</FileAlignment>
     <MyType>WindowsForms</MyType>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
-    <TargetFrameworkProfile>Client</TargetFrameworkProfile>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkProfile>
+    </TargetFrameworkProfile>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -40,6 +41,7 @@
     <OutputPath>bin\Debug\</OutputPath>
     <DocumentationFile>FolderPackagerGui.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|x86' ">
     <PlatformTarget>x86</PlatformTarget>
@@ -50,6 +52,7 @@
     <OutputPath>bin\Release\</OutputPath>
     <DocumentationFile>FolderPackagerGui.xml</DocumentationFile>
     <NoWarn>42016,41999,42017,42018,42019,42032,42036,42020,42021,42022</NoWarn>
+    <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
     <OptionExplicit>On</OptionExplicit>
@@ -168,10 +171,6 @@
       <Project>{E1F12AC9-D4FB-4C9C-BF1F-712B1FE2E667}</Project>
       <Name>LDAP</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\ContentDMPackager\MetadataUtilities\MetadataUtilities.vbproj">
-      <Project>{D03D3545-EB61-43DF-9736-8D0502F3BE9D}</Project>
-      <Name>MetadataUtilities</Name>
-    </ProjectReference>
     <ProjectReference Include="..\CollectionsRegistry\CollectionsRegistry.vbproj">
       <Project>{178E628C-C603-40BE-B7BA-BA096F9DA990}</Project>
       <Name>CollectionsRegistry</Name>
@@ -179,6 +178,14 @@
     <ProjectReference Include="..\FolderPackager\FolderPackager.vbproj">
       <Project>{974160B2-E879-4F75-A38C-B15655E276BA}</Project>
       <Name>FolderPackager</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\MARCVocabulary\MARCVocabulary.vbproj">
+      <Project>{A5BEF2BC-2527-4FE1-B363-252A55319470}</Project>
+      <Name>MARCVocabulary</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Medusa\Medusa.vbproj">
+      <Project>{ce8c3719-d278-4675-9da7-0df6665f66ca}</Project>
+      <Name>Medusa</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />

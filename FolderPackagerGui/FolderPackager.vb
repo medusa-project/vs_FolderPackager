@@ -8,7 +8,7 @@ Imports System.Security
 Imports System.Net
 Imports Uiuc.Library.Ldap
 Imports System.Net.Mail
-Imports Uiuc.Library.MetadataUtilities
+Imports Uiuc.Library.Medusa
 
 Public Class FolderPackager
 
@@ -39,7 +39,7 @@ Public Class FolderPackager
 
 
   Private Sub btnCheckCollection_Click(sender As System.Object, e As System.EventArgs) Handles btnCheckCollection.Click
-    Dim cr As New CollectionRecord(updnCollectionID.Value)
+    Dim cr As New ModsCollectionRecord(updnCollectionID.Value)
     If String.IsNullOrWhiteSpace(cr.Uuid) Then
       lblCollectionUuid.Text = "Error: Not Found"
     Else
