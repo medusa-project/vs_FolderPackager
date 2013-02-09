@@ -8,60 +8,30 @@ Imports System.Xml
 Public Class FitsController
   Inherits System.Web.Mvc.Controller
 
+  Function GetFits(url As String) As ActionResult
+    Dim fResult As FitsResult
+    Try
+      fResult = Me.GetFitsResult(url)
+    Catch ex As Exception
+      Return Content(ex.Message, "text/plain")
+    End Try
+
+    Return Content(fResult.FitsXml.OuterXml, "text/xml")
+  End Function
+
   Function GetPremis(id As String, url As String, validate As Boolean?) As ActionResult
 
     If Not validate.HasValue Then
       validate = False
     End If
 
-    If String.IsNullOrWhiteSpace(url) Then
-      Response.StatusCode = HttpStatusCode.BadRequest
-      Return Content("Url is a required paramater.", "text/plain")
-    End If
-
-    'retrieve the file specified by the url and save to temp file
-
-    Dim httpReq As WebRequest = Nothing
-    Dim httpRsp As WebResponse = Nothing
-    Try
-      httpReq = WebRequest.Create(url)
-      httpRsp = httpReq.GetResponse
-    Catch wex As WebException
-      Response.StatusCode = HttpStatusCode.BadRequest
-      Return Content(wex.Message, "text/plain")
-    Catch ex As Exception
-      Response.StatusCode = HttpStatusCode.InternalServerError
-      Return Content(ex.Message, "text/plain")
-    End Try
-
-    Dim filename As String = ""
-    Try
-      filename = Path.GetTempFileName()
-      Dim filestrm As New FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None)
-
-      httpRsp.GetResponseStream.CopyTo(filestrm)
-
-      filestrm.Close()
-    Catch ex As Exception
-      Response.StatusCode = HttpStatusCode.InternalServerError
-      Return Content(ex.Message, "text/plain")
-    End Try
-
-    httpRsp.GetResponseStream.Close()
-
-    'run fits
     Dim fResult As FitsResult
     Try
-      fResult = New FitsResult(filename)
+      fResult = Me.GetFitsResult(url)
     Catch ex As Exception
-      Response.StatusCode = HttpStatusCode.InternalServerError
       Return Content(ex.Message, "text/plain")
     End Try
 
-    'cleanup the temp file
-    If Not String.IsNullOrWhiteSpace(filename) Then
-      System.IO.File.Delete(filename)
-    End If
 
     'create a premis object containing fits result
 
@@ -91,7 +61,7 @@ Public Class FitsController
 
 
     Dim pCont = New PremisContainer(pObj)
-    pCont.Agents.Add(pAgt)
+    'pCont.Agents.Add(pAgt)
     pCont.Events.Add(pEvt)
     pCont.ValidateXML = validate
 
@@ -101,4 +71,74 @@ Public Class FitsController
     Return Content(pStr.ToString, "text/xml")
   End Function
 
+
+  Private Function GetFitsResult(url As String) As FitsResult
+    If String.IsNullOrWhiteSpace(url) Then
+      Response.StatusCode = HttpStatusCode.BadRequest
+      Throw New Exception("Url is a required paramater.")
+    End If
+
+    'retrieve the file specified by the url and save to temp file
+
+    Dim httpReq As WebRequest = Nothing
+    Dim httpRsp As WebResponse = Nothing
+    Try
+      httpReq = WebRequest.Create(url)
+      httpRsp = httpReq.GetResponse
+    Catch wex As WebException
+      Response.StatusCode = HttpStatusCode.BadRequest
+      Throw New Exception(wex.Message)
+    Catch ex As Exception
+      Response.StatusCode = HttpStatusCode.BadRequest
+      Throw New Exception(ex.Message)
+    End Try
+
+    'get some metadata from the http response
+    Dim httpLen As Long = httpRsp.ContentLength
+    Dim httpTyp As String = httpRsp.ContentType
+    Dim httpMd5 As String = httpRsp.Headers.Item(HttpResponseHeader.ContentMd5)
+
+    Dim filename As String = ""
+    Try
+      filename = Path.GetTempFileName()
+
+      Dim filestrm As New FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None)
+
+      httpRsp.GetResponseStream.CopyTo(filestrm)
+
+      filestrm.Close()
+
+    Catch ex As Exception
+      Response.StatusCode = HttpStatusCode.BadRequest
+      Throw New Exception(ex.Message)
+    End Try
+
+    httpRsp.GetResponseStream.Close()
+
+    'run fits
+    Dim fResult As FitsResult
+    Try
+      fResult = New FitsResult(filename)
+    Catch ex As Exception
+      Response.StatusCode = HttpStatusCode.BadRequest
+      Throw New Exception(ex.Message)
+    End Try
+
+    'cleanup the temp file
+    If Not String.IsNullOrWhiteSpace(filename) Then
+      System.IO.File.Delete(filename)
+    End If
+
+    If httpLen <> fResult.Size Then
+      Response.StatusCode = HttpStatusCode.BadRequest
+      Throw New Exception("HTTP Content-Length does not match the FITS file size.")
+    End If
+
+    If Not String.IsNullOrWhiteSpace(httpMd5) AndAlso Not httpMd5.Equals(fResult.Md5, StringComparison.InvariantCultureIgnoreCase) Then
+      Response.StatusCode = HttpStatusCode.BadRequest
+      Throw New Exception("HTTP Content-MD5 does not match the FITS MD5 checksum.")
+    End If
+
+    Return fResult
+  End Function
 End Class

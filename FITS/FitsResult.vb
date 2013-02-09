@@ -34,6 +34,13 @@ Public Class FitsResult
     End Get
   End Property
 
+  Public ReadOnly Property Md5 As String
+    Get
+      Dim nd As XmlElement = _xml.SelectSingleNode("//fits:fileinfo/fits:md5checksum", _xmlns)
+      Return nd.InnerText
+    End Get
+  End Property
+
   Public ReadOnly Property Created As DateTime?
     Get
       Dim nd As XmlElement = _xml.SelectSingleNode("//fits:fileinfo/fits:created", _xmlns)
@@ -262,29 +269,34 @@ Public Class FitsResult
 
   Private Sub RunFITS(filename As String)
 
-    'Start the child process.
-    Dim p As Process = New Process()
-    'Redirect the output stream of the child process.
-    p.StartInfo.UseShellExecute = False
-    p.StartInfo.RedirectStandardOutput = True
-    p.StartInfo.RedirectStandardError = True
-    p.StartInfo.FileName = MedusaAppSettings.Settings.FitsScriptPath
-    p.StartInfo.WorkingDirectory = MedusaAppSettings.Settings.FitsHome
-    p.StartInfo.Arguments = String.Format("-i ""{0}""", filename)
-    p.Start()
-    'Do not wait for the child process to exit before
-    'reading to the end of its redirected stream.
-    'p.WaitForExit();
-    'Read the output stream first and then wait.
-    Dim output As String = p.StandardOutput.ReadToEnd()
-    _err = p.StandardError.ReadToEnd
-    p.WaitForExit()
+    Dim output As String = ""
+    Try
+      'Start the child process.
+      Dim p As Process = New Process()
+      'Redirect the output stream of the child process.
+      p.StartInfo.UseShellExecute = False
+      p.StartInfo.RedirectStandardOutput = True
+      p.StartInfo.RedirectStandardError = True
+      'p.StartInfo.FileName = "C:\Windows\System32\cmd.exe"
+      p.StartInfo.FileName = MedusaAppSettings.Settings.FitsScriptPath
+      p.StartInfo.WorkingDirectory = MedusaAppSettings.Settings.FitsHome
+      p.StartInfo.Arguments = String.Format("-i ""{0}""", filename)
+      p.Start()
+      'Read the output stream first and then wait.
+      output = p.StandardOutput.ReadToEnd()
+      _err = p.StandardError.ReadToEnd
+      p.WaitForExit()
+      If Not String.IsNullOrWhiteSpace(_err) Then
+        Throw New Exception(_err)
+      End If
+    Catch ex As Exception
+      Throw
+    End Try
 
     _xml = New XmlDocument
 
     _xml.LoadXml(output)
 
   End Sub
-
 
 End Class
