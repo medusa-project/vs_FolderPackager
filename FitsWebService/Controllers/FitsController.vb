@@ -2,11 +2,26 @@
 Imports Uiuc.Library.Premis
 Imports Uiuc.Library.Medusa
 Imports System.Net
+Imports System.Net.Security
+Imports System.Security.Cryptography.X509Certificates
 Imports System.IO
 Imports System.Xml
 
 Public Class FitsController
   Inherits System.Web.Mvc.Controller
+
+  Protected Overloads Overrides Sub Initialize(ByVal rc As RequestContext)
+    MyBase.Initialize(rc)
+
+    ServicePointManager.ServerCertificateValidationCallback = AddressOf ValidateCert
+    ServicePointManager.SecurityProtocol = SecurityProtocolType.Ssl3
+  End Sub
+
+  Public Function ValidateCert(sender As Object, certificate As X509Certificate, chain As X509Chain, sslPolicyErrors As SslPolicyErrors) As Boolean
+    'ignore all certificate errors
+    Return True
+  End Function
+
 
   Function GetFits(url As String) As ActionResult
     Dim fResult As FitsResult
