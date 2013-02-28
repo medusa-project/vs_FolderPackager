@@ -24,9 +24,15 @@ Public Class FitsController
 
 
   Function GetFits(url As String) As ActionResult
-    Dim fResult As FitsResult
+    Dim fResult As FitsResult = Nothing
     Try
       fResult = Me.GetFitsResult(url)
+    Catch wex As WebException
+      If TypeOf wex.Response Is HttpWebResponse AndAlso CType(wex.Response, HttpWebResponse).StatusCode = HttpStatusCode.Unauthorized Then
+        Response.AddHeader("WWW-Authenticate", "Basic realm=""MedusaFits""")
+        Return New HttpUnauthorizedResult()
+      Else
+      End If
     Catch ex As Exception
       Return Content(ex.Message, "text/plain")
     End Try
@@ -40,9 +46,15 @@ Public Class FitsController
       validate = False
     End If
 
-    Dim fResult As FitsResult
+    Dim fResult As FitsResult = Nothing
     Try
       fResult = Me.GetFitsResult(url)
+    Catch wex As WebException
+      If TypeOf wex.Response Is HttpWebResponse AndAlso CType(wex.Response, HttpWebResponse).StatusCode = HttpStatusCode.Unauthorized Then
+        Response.AddHeader("WWW-Authenticate", "Basic realm=""MedusaFits""")
+        Return New HttpUnauthorizedResult()
+      Else
+      End If
     Catch ex As Exception
       Return Content(ex.Message, "text/plain")
     End Try
@@ -95,17 +107,36 @@ Public Class FitsController
 
     'retrieve the file specified by the url and save to temp file
 
+    'Need to be able to handle authentication 
+    Dim auth As String = Request.Headers.Item("Authorization")
+    Dim uid As String = ""
+    Dim pwd As String = ""
+    Dim cred As NetworkCredential = Nothing
+    If Not String.IsNullOrWhiteSpace(auth) Then
+      If auth.Trim.StartsWith("basic ", StringComparison.InvariantCultureIgnoreCase) Then
+        auth = auth.Substring(6)
+        auth = ASCIIEncoding.ASCII.GetString(Convert.FromBase64String(auth))
+        Dim parts() As String = Split(auth, ":", 2, CompareMethod.Binary)
+        uid = parts(0)
+        pwd = parts(1)
+        cred = New NetworkCredential(uid, pwd)
+      End If
+    End If
+
     Dim httpReq As WebRequest = Nothing
     Dim httpRsp As WebResponse = Nothing
     Try
       httpReq = WebRequest.Create(url)
+      If cred IsNot Nothing Then
+        httpReq.Credentials = cred
+      End If
       httpRsp = httpReq.GetResponse
     Catch wex As WebException
       Response.StatusCode = HttpStatusCode.BadRequest
-      Throw New Exception(wex.Message)
+      Throw
     Catch ex As Exception
       Response.StatusCode = HttpStatusCode.BadRequest
-      Throw New Exception(ex.Message)
+      Throw
     End Try
 
     'get some metadata from the http response
@@ -125,7 +156,7 @@ Public Class FitsController
 
     Catch ex As Exception
       Response.StatusCode = HttpStatusCode.BadRequest
-      Throw New Exception(ex.Message)
+      Throw
     End Try
 
     httpRsp.GetResponseStream.Close()
@@ -136,7 +167,7 @@ Public Class FitsController
       fResult = New FitsResult(filename)
     Catch ex As Exception
       Response.StatusCode = HttpStatusCode.BadRequest
-      Throw New Exception(ex.Message)
+      Throw
     End Try
 
     'cleanup the temp file
@@ -149,7 +180,7 @@ Public Class FitsController
       Throw New Exception("HTTP Content-Length does not match the FITS file size.")
     End If
 
-    If Not String.IsNullOrWhiteSpace(httpMd5) AndAlso Not httpMd5.Equals(fResult.Md5, StringComparison.InvariantCultureIgnoreCase) Then
+    If Not String.IsNullOrWhiteSpace(httpMd5) AndAlso Not httpMd5.Equals(fResult.Md5Base64, StringComparison.InvariantCultureIgnoreCase) Then
       Response.StatusCode = HttpStatusCode.BadRequest
       Throw New Exception("HTTP Content-MD5 does not match the FITS MD5 checksum.")
     End If

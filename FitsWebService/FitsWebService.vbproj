@@ -178,6 +178,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="My Project\PublishProfiles\QuestInetpub.pubxml" />
+    <Content Include="secret.config" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
