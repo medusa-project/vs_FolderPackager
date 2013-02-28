@@ -5,6 +5,7 @@ Imports Uiuc.Library.Premis
 Imports Uiuc.Library.Ldap
 Imports Uiuc.Library.Medusa
 Imports System.Security
+Imports System.Runtime.Remoting.Metadata.W3cXsd2001
 
 ''' <summary>
 ''' Represent the results of running a file through the FITS file characterization program
@@ -38,6 +39,16 @@ Public Class FitsResult
     Get
       Dim nd As XmlElement = _xml.SelectSingleNode("//fits:fileinfo/fits:md5checksum", _xmlns)
       Return nd.InnerText
+    End Get
+  End Property
+
+  Public ReadOnly Property Md5Base64 As String
+    Get
+      Dim md5 As String = Me.Md5
+
+      Dim byt() As Byte = SoapHexBinary.Parse(md5).Value
+
+      Return Convert.ToBase64String(byt)
     End Get
   End Property
 
