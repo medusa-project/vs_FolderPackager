@@ -6,6 +6,7 @@ Imports System.Net.Security
 Imports System.Security.Cryptography.X509Certificates
 Imports System.IO
 Imports System.Xml
+Imports System.Text.RegularExpressions
 
 Public Class FitsController
   Inherits System.Web.Mvc.Controller
@@ -22,17 +23,36 @@ Public Class FitsController
     Return True
   End Function
 
+  Private Function HandleWebException(wex As WebException) As ActionResult
+    If TypeOf wex.Response Is HttpWebResponse AndAlso CType(wex.Response, HttpWebResponse).StatusCode = HttpStatusCode.Unauthorized Then
+      Dim resp As HttpWebResponse = CType(wex.Response, HttpWebResponse)
+      Dim wwwAuth As String = resp.GetResponseHeader("WWW-Authenticate")
+      Dim rlm As String = GetRealm(wwwAuth)
+      Response.AddHeader("WWW-Authenticate", "Basic " & rlm)
+      Return New HttpUnauthorizedResult()
+    Else
+      Return Content(wex.Message, "text/plain")
+    End If
+  End Function
+
+  Private Function GetRealm(auth As String) As String
+    Dim ret As String = ""
+    Dim re As New Regex("realm\s*=\s*""([^""]+)""", RegexOptions.IgnoreCase)
+
+    Dim ms = re.Matches(auth)
+
+    Dim m = ms.Item(1).Groups.Item(0)
+    ret = m.Value
+
+    Return ret
+  End Function
 
   Function GetFits(url As String) As ActionResult
     Dim fResult As FitsResult = Nothing
     Try
       fResult = Me.GetFitsResult(url)
     Catch wex As WebException
-      If TypeOf wex.Response Is HttpWebResponse AndAlso CType(wex.Response, HttpWebResponse).StatusCode = HttpStatusCode.Unauthorized Then
-        Response.AddHeader("WWW-Authenticate", "Basic realm=""MedusaFits""")
-        Return New HttpUnauthorizedResult()
-      Else
-      End If
+      Return HandleWebException(wex)
     Catch ex As Exception
       Return Content(ex.Message, "text/plain")
     End Try
@@ -50,11 +70,7 @@ Public Class FitsController
     Try
       fResult = Me.GetFitsResult(url)
     Catch wex As WebException
-      If TypeOf wex.Response Is HttpWebResponse AndAlso CType(wex.Response, HttpWebResponse).StatusCode = HttpStatusCode.Unauthorized Then
-        Response.AddHeader("WWW-Authenticate", "Basic realm=""MedusaFits""")
-        Return New HttpUnauthorizedResult()
-      Else
-      End If
+      Return HandleWebException(wex)
     Catch ex As Exception
       Return Content(ex.Message, "text/plain")
     End Try
@@ -98,6 +114,17 @@ Public Class FitsController
     Return Content(pStr.ToString, "text/xml")
   End Function
 
+  Private Sub AddTrustedDomansToCache(cache As CredentialCache, cred As NetworkCredential)
+    Dim trustedAll As String = ConfigurationManager.AppSettings.Item("TrustedDomains")
+    Dim delims() As Char = {",", ";", " ", "|"}
+    Dim trustedArr() As String = trustedAll.Split(delims, StringSplitOptions.RemoveEmptyEntries)
+    For Each trusted In trustedArr
+      Dim u As New Uri(String.Format("http://{0}/", trusted))
+      cache.Add(u, "Basic", cred)
+      cache.Add(u, "Digest", cred)
+    Next
+
+  End Sub
 
   Private Function GetFitsResult(url As String) As FitsResult
     If String.IsNullOrWhiteSpace(url) Then
@@ -112,6 +139,7 @@ Public Class FitsController
     Dim uid As String = ""
     Dim pwd As String = ""
     Dim cred As NetworkCredential = Nothing
+    Dim credCache As CredentialCache = Nothing
     If Not String.IsNullOrWhiteSpace(auth) Then
       If auth.Trim.StartsWith("basic ", StringComparison.InvariantCultureIgnoreCase) Then
         auth = auth.Substring(6)
@@ -120,6 +148,11 @@ Public Class FitsController
         uid = parts(0)
         pwd = parts(1)
         cred = New NetworkCredential(uid, pwd)
+        credCache = New CredentialCache()
+        Dim u As New Uri(url)
+        credCache.Add(u, "Basic", cred)
+        credCache.Add(u, "Digest", cred)
+        AddTrustedDomansToCache(credCache, cred)
       End If
     End If
 
@@ -127,8 +160,8 @@ Public Class FitsController
     Dim httpRsp As WebResponse = Nothing
     Try
       httpReq = WebRequest.Create(url)
-      If cred IsNot Nothing Then
-        httpReq.Credentials = cred
+      If credCache IsNot Nothing Then
+        httpReq.Credentials = credCache
       End If
       httpRsp = httpReq.GetResponse
     Catch wex As WebException
