@@ -1,0 +1,27 @@
+﻿FITS File Characterization Service
+
+FITS (File Information Tool Set) uses a set of eight tools for identifying, validating, and extracting technical metadata. This service provides a simple web interface to FITS.
+
+You can either return the original FITS XML:
+https://quest.grainger.illinois.edu/medusa/fits/getfits?url={URL}
+
+Or you can return PREMIS derived from the FITS:
+https://quest.grainger.illinois.edu/medusa/fits/getpremis?url={URL}
+https://quest.grainger.illinois.edu/medusa/fits/getpremis/{LOCAL_ID}?url={URL}
+
+Here are some examples:
+
+https://quest.grainger.illinois.edu/medusa/fits/getpremis/X123456780?url=http://illinois.edu/lb/files/2013/01/29/43839.jpg
+https://quest.grainger.illinois.edu/medusa/fits/getfits?url=http://illinois.edu/lb/files/2013/01/29/43839.jpg
+
+The LOCAL_ID is optional. If it is present it is just used to create a local PREMIS Identifier, such as:
+<objectIdentifier>
+    <objectIdentifierType>LOCAL</objectIdentifierType>
+    <objectIdentifierValue>LOCAL_ID</objectIdentifierValue>
+</objectIdentifier>
+
+This might be useful in the future if we want to generate PREMIS for direct ingest into Fedora.
+
+The performance of this is not great; it can take 10+ seconds to characterize a typical JPEG file. The bottle neck seems to be FITS itself which is somewhat understandable in that my web app is launching an external java app process and waiting for it to return results. If you run FITS directly from the command line the performance is similar.
+
+The service can accommodate resources that are protected by Basic or Digest Authentication. If the requested URL requires authentication, this web service will return a 401 Not Authorized response, requesting Basic authentication which is protected by secure HTTPS. The Authorization that is then subsequently passed by the client back to the service will be redirected back to the originally requested resource.
