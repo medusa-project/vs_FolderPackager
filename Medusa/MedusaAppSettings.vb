@@ -1,6 +1,7 @@
 ﻿Imports System.Configuration
 Imports System.IO
 Imports System.Collections.Specialized
+Imports System.Reflection
 
 ''' <summary>
 ''' A singleton class provides access to the Medusa properties from the various configuration files, such as app.config
@@ -10,8 +11,54 @@ Public Class MedusaAppSettings
 
   Private Shared _thisInst As MedusaAppSettings
 
+  'TODO: Would probably be good to rewrite this class to use a dictionary of values instead of a bunch of private variables
+  Private _dict As Dictionary(Of String, String)
+
+  ' *** Here is the template for getting or setting appsettings string properties
+  Private Property SomeSettingKey As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Private Function GetValue(key As String, defaultValue As String) As String
+    If Not _dict.ContainsKey(key) Then
+      If ConfigurationManager.AppSettings.AllKeys.Contains(key) Then
+        _dict.Add(key, ConfigurationManager.AppSettings.Item(key))
+      Else
+        Dim confSet As NameValueCollection = ConfigurationManager.GetSection("secretAppSettings")
+        If confSet IsNot Nothing AndAlso confSet.AllKeys.Contains(key) Then
+          _dict.Add(key, confSet.Item(key))
+        Else
+          _dict.Add(key, defaultValue)
+        End If
+      End If
+    End If
+    Return _dict.Item(key)
+  End Function
+
+  Private Function GetValue(key As String) As String
+    Return GetValue(key, Nothing)
+  End Function
+
+  Private Sub SetValue(key As String, value As String)
+    _dict.Item(key) = value
+  End Sub
+
   Protected Sub New()
     'this is a singleton
+    _dict = New Dictionary(Of String, String)(StringComparer.InvariantCultureIgnoreCase)
+  End Sub
+
+  ''' <summary>
+  ''' Reset all values to their orignal app.config settings
+  ''' </summary>
+  ''' <remarks></remarks>
+  Public Sub Reset()
+    _dict.Clear()
   End Sub
 
   Public Shared Function Settings() As MedusaAppSettings
@@ -22,121 +69,102 @@ Public Class MedusaAppSettings
   End Function
 
 
-  Private _connectionString As String = Nothing
-  Public Property ConnectionString As String
+  Private _handleManagerConnectionString As String = Nothing
+  Public Property HandleManagerConnectionString As String
     Get
-      If _connectionString Is Nothing Then
-        _connectionString = ConfigurationManager.ConnectionStrings.Item("Medusa_ConnectionString").ConnectionString
+      If _handleManagerConnectionString Is Nothing Then
+        _handleManagerConnectionString = ConfigurationManager.ConnectionStrings.Item("HandleManagerConnectionString").ConnectionString
       End If
-      Return _connectionString
+      Return _handleManagerConnectionString
     End Get
     Set(value As String)
-      _connectionString = value
+      _handleManagerConnectionString = value
+    End Set
+  End Property
+
+  Private _medusaConnectionString As String = Nothing
+  Public Property MedusaConnectionString As String
+    Get
+      If _medusaConnectionString Is Nothing Then
+        _medusaConnectionString = ConfigurationManager.ConnectionStrings.Item("MedusaConnectionString").ConnectionString
+      End If
+      Return _medusaConnectionString
+    End Get
+    Set(value As String)
+      _medusaConnectionString = value
     End Set
   End Property
 
 
-  Private _agentsFolder As String = Nothing
   Public Property AgentsFolder As String
     Get
-      If _agentsFolder Is Nothing Then
-        _agentsFolder = ConfigurationManager.AppSettings.Item("AgentsFolder")
-      End If
-      Return _agentsFolder
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _agentsFolder = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _collectionsFolder As String = Nothing
   Public Property CollectionsFolder As String
     Get
-      If _collectionsFolder Is Nothing Then
-        _collectionsFolder = ConfigurationManager.AppSettings.Item("CollectionsFolder")
-      End If
-      Return _collectionsFolder
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _collectionsFolder = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _handlePrefix As String = Nothing
   Public Property HandlePrefix As String
     Get
-      If _handlePrefix Is Nothing Then
-        _handlePrefix = ConfigurationManager.AppSettings.Item("Handle.Prefix")
-      End If
-      Return _handlePrefix
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _handlePrefix = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _handleProject As String = Nothing
   Public Property HandleProject As String
     Get
-      If _handleProject Is Nothing Then
-        _handleProject = ConfigurationManager.AppSettings.Item("Handle.Project")
-      End If
-      Return _handleProject
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _handleProject = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _handleLocalIdSeparator As String = Nothing
   Public Property HandleLocalIdSeparator As String
     Get
-      If _handleLocalIdSeparator Is Nothing Then
-        _handleLocalIdSeparator = ConfigurationManager.AppSettings.Item("Handle.LocalIdSeparator")
-      End If
-      Return _handleLocalIdSeparator
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _handleLocalIdSeparator = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _handleServiceURL As String = Nothing
   Public Property HandleServiceURL As String
     Get
-      If _handleServiceURL Is Nothing Then
-        _handleServiceURL = ConfigurationManager.AppSettings.Item("Handle.ServiceURL")
-      End If
-      Return _handleServiceURL
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _handleServiceURL = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _handleResourceType As String = Nothing
   Public Property HandleResourceType As String
     Get
-      If _handleResourceType Is Nothing Then
-        _handleResourceType = ConfigurationManager.AppSettings.Item("Handle.ResourceType")
-      End If
-      Return _handleResourceType
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _handleResourceType = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _handleResolverBaseURL As String = Nothing
   Public Property HandleResolverBaseURL As String
     Get
-      If _handleResolverBaseURL Is Nothing Then
-        _handleResolverBaseURL = ConfigurationManager.AppSettings.Item("Handle.ResolverBaseURL")
-      End If
-      Return _handleResolverBaseURL
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _handleResolverBaseURL = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
@@ -144,7 +172,7 @@ Public Class MedusaAppSettings
   Public Property HandleGeneration As HandleGenerationType
     Get
       If _handleGeneration Is Nothing Then
-        _handleGeneration = [Enum].Parse(GetType(HandleGenerationType), ConfigurationManager.AppSettings.Item("Handle.Generation"), True)
+        _handleGeneration = [Enum].Parse(GetType(HandleGenerationType), ConfigurationManager.AppSettings.Item("HandleGeneration"), True)
       End If
       Return _handleGeneration
     End Get
@@ -153,55 +181,39 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
-  Private _getCollectionModsUrl As String = Nothing
   Public Property GetCollectionModsUrl As String
     Get
-      If _getCollectionModsUrl Is Nothing Then
-        _getCollectionModsUrl = ConfigurationManager.AppSettings.Item("GetCollectionModsUrl")
-      End If
-      Return _getCollectionModsUrl
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _getCollectionModsUrl = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _getCollectionJsonUrl As String = Nothing
   Public Property GetCollectionJsonUrl As String
     Get
-      If _getCollectionJsonUrl Is Nothing Then
-        _getCollectionJsonUrl = ConfigurationManager.AppSettings.Item("GetCollectionJsonUrl")
-      End If
-      Return _getCollectionJsonUrl
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _getCollectionJsonUrl = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _getMarcUrl As String = Nothing
   Public Property GetMarcUrl As String
     Get
-      If _getMarcUrl Is Nothing Then
-        _getMarcUrl = ConfigurationManager.AppSettings.Item("GetMarcUrl")
-      End If
-      Return _getMarcUrl
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _getMarcUrl = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _checksumAlgorithm As String = Nothing
   Public Property ChecksumAlgorithm As String
     Get
-      If _checksumAlgorithm Is Nothing Then
-        _checksumAlgorithm = ConfigurationManager.AppSettings.Item("ChecksumAlgorithm")
-      End If
-      Return _checksumAlgorithm
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _checksumAlgorithm = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
@@ -252,30 +264,28 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
-  Private _fitsHome As String = Nothing
   Public Property FitsHome As String
     Get
-      If _fitsHome Is Nothing Then
-        _fitsHome = ConfigurationManager.AppSettings.Item("FitsHome")
-      End If
-      Return _fitsHome
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _fitsHome = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _fitsScript As String = Nothing
   Public Property FitsScript As String
     Get
-      If _fitsScript Is Nothing Then
-        _fitsScript = ConfigurationManager.AppSettings.Item("FitsScript")
-      End If
-      Return _fitsScript
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _fitsScript = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
+  End Property
+
+  Public ReadOnly Property FitsScriptPath As String
+    Get
+      Return Path.Combine(FitsHome, FitsScript)
+    End Get
   End Property
 
   Private _objectAlreadyExists As ObjectAlreadyExistsType? = Nothing
@@ -291,32 +301,21 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
-  Private _workingFolder As String = Nothing
   Public Property WorkingFolder As String
     Get
-      If _workingFolder Is Nothing Then
-        _workingFolder = ConfigurationManager.AppSettings.Item("WorkingFolder")
-      End If
-      Return _workingFolder
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _workingFolder = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _logFile As String = Nothing
   Public Property LogFile As String
     Get
-      If _logFile Is Nothing Then
-        _logFile = ConfigurationManager.AppSettings.Item("LogFile")
-        If String.IsNullOrWhiteSpace(_logFile) Then
-          _logFile = "FolderPackager.log"
-        End If
-      End If
-      Return _logFile
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4), "FolderPackager.log")
     End Get
     Set(value As String)
-      _logFile = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
@@ -327,81 +326,57 @@ Public Class MedusaAppSettings
   End Property
 
 
-  Private _sourceFolder As String = Nothing
   Public Property SourceFolder As String
     Get
-      If _sourceFolder Is Nothing Then
-        _sourceFolder = ConfigurationManager.AppSettings.Item("SourceFolder")
-      End If
-      Return _sourceFolder
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _sourceFolder = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _collectionId As String = Nothing
   Public Property CollectionId As String
     Get
-      If _collectionId Is Nothing Then
-        _collectionId = ConfigurationManager.AppSettings.Item("CollectionId")
-      End If
-      Return _collectionId
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _collectionId = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _collectionHandle As String = Nothing
   Public Property CollectionHandle As String
     Get
-      If _collectionHandle Is Nothing Then
-        _collectionHandle = ConfigurationManager.AppSettings.Item("CollectionHandle")
-      End If
-      Return _collectionHandle
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _collectionHandle = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _collectionName As String = Nothing
   Public Property CollectionName As String
     Get
-      If _collectionName Is Nothing Then
-        _collectionName = ConfigurationManager.AppSettings.Item("CollectionName")
-      End If
-      Return _collectionName
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _collectionName = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _collectionURL As String = Nothing
   Public Property CollectionURL As String
     Get
-      If _collectionURL Is Nothing Then
-        _collectionURL = ConfigurationManager.AppSettings.Item("CollectionURL")
-      End If
-      Return _collectionURL
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _collectionURL = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _collectionDescriptionPath As String = Nothing
   Public Property CollectionDescriptionPath As String
     Get
-      If _collectionDescriptionPath Is Nothing Then
-        _collectionDescriptionPath = ConfigurationManager.AppSettings.Item("CollectionDescriptionPath")
-      End If
-      Return _collectionDescriptionPath
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _collectionDescriptionPath = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
@@ -418,159 +393,148 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
-  Private _premisDisseminationRightsBasis As String = Nothing
   Public Property PremisDisseminationRightsBasis As String
     Get
-      If _premisDisseminationRightsBasis Is Nothing Then
-        _premisDisseminationRightsBasis = ConfigurationManager.AppSettings.Item("PremisDisseminationRightsBasis")
+      Dim ret As String = GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+      If MedusaAppSettings.ValidRightsBasis.Contains(ret) Then
+        Return ret
+      Else
+        Throw New MedusaException(String.Format("The value '{0}' is not valid for Rights Basis.", ret))
       End If
-      Return _premisDisseminationRightsBasis
     End Get
     Set(value As String)
-      _premisDisseminationRightsBasis = value
+      If MedusaAppSettings.ValidRightsBasis.Contains(value) Then
+        SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+      Else
+        Throw New MedusaException(String.Format("The value '{0}' is not valid for Rights Basis.", value))
+      End If
     End Set
   End Property
 
-  Private _premisDisseminationCopyrightStatus As String = Nothing
+  Public Property PremisDisseminationStatuteJurisdiction As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property PremisDisseminationStatuteCitation As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+
+  Public Property PremisDisseminationCopyrightJurisdiction As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
   Public Property PremisDisseminationCopyrightStatus As String
     Get
-      If _premisDisseminationCopyrightStatus Is Nothing Then
-        _premisDisseminationCopyrightStatus = ConfigurationManager.AppSettings.Item("PremisDisseminationCopyrightStatus")
-      End If
-      Return _premisDisseminationCopyrightStatus
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _premisDisseminationCopyrightStatus = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _premisDisseminationRights As String = Nothing
   Public Property PremisDisseminationRights As String
     Get
-      If _premisDisseminationRights Is Nothing Then
-        _premisDisseminationRights = ConfigurationManager.AppSettings.Item("PremisDisseminationRights")
-      End If
-      Return _premisDisseminationRights
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _premisDisseminationRights = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _premisDisseminationRightsRestrictions As String = Nothing
   Public Property PremisDisseminationRightsRestrictions As String
     Get
-      If _premisDisseminationRightsRestrictions Is Nothing Then
-        _premisDisseminationRightsRestrictions = ConfigurationManager.AppSettings.Item("PremisDisseminationRightsRestrictions")
-      End If
-      Return _premisDisseminationRightsRestrictions
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _premisDisseminationRightsRestrictions = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _metadataMarcRegex As String = Nothing
   Public Property MetadataMarcRegex As String
     Get
-      If _metadataMarcRegex Is Nothing Then
-        _metadataMarcRegex = ConfigurationManager.AppSettings.Item("MetadataMarcRegex")
-      End If
-      Return _metadataMarcRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _metadataMarcRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _metadataDcRdfRegex As String = Nothing
   Public Property MetadataDcRdfRegex As String
     Get
-      If _metadataDcRdfRegex Is Nothing Then
-        _metadataDcRdfRegex = ConfigurationManager.AppSettings.Item("MetadataDcRdfRegex")
-      End If
-      Return _metadataDcRdfRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _metadataDcRdfRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _metadataSpreadsheetRegex As String = Nothing
   Public Property MetadataSpreadsheetRegex As String
     Get
-      If _metadataSpreadsheetRegex Is Nothing Then
-        _metadataSpreadsheetRegex = ConfigurationManager.AppSettings.Item("MetadataSpreadsheetRegex")
-      End If
-      Return _metadataSpreadsheetRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _metadataSpreadsheetRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _omitFoldersRegex As String = Nothing
   Public Property OmitFoldersRegex As String
     Get
-      If _omitFoldersRegex Is Nothing Then
-        _omitFoldersRegex = ConfigurationManager.AppSettings.Item("OmitFoldersRegex")
-      End If
-      Return _omitFoldersRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _omitFoldersRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _omitFilesRegex As String = Nothing
   Public Property OmitFilesRegex As String
     Get
-      If _omitFilesRegex Is Nothing Then
-        _omitFilesRegex = ConfigurationManager.AppSettings.Item("OmitFilesRegex")
-      End If
-      Return _omitFilesRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _omitFilesRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _derivativeContentFileRegex As String = Nothing
   Public Property DerivativeContentFileRegex As String
     Get
-      If _derivativeContentFileRegex Is Nothing Then
-        _derivativeContentFileRegex = ConfigurationManager.AppSettings.Item("DerivativeContentFileRegex")
-      End If
-      Return _derivativeContentFileRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _derivativeContentFileRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _originalContentFileRegex As String = Nothing
   Public Property OriginalContentFileRegex As String
     Get
-      If _originalContentFileRegex Is Nothing Then
-        _originalContentFileRegex = ConfigurationManager.AppSettings.Item("OriginalContentFileRegex")
-      End If
-      Return _originalContentFileRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _originalContentFileRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _significantFileIdentiferRegex As String = Nothing
   Public Property SignificantFileIdentiferRegex As String
     Get
-      If _significantFileIdentiferRegex Is Nothing Then
-        _significantFileIdentiferRegex = ConfigurationManager.AppSettings.Item("SignificantFileIdentiferRegex")
-      End If
-      Return _significantFileIdentiferRegex
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _significantFileIdentiferRegex = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
@@ -588,95 +552,71 @@ Public Class MedusaAppSettings
   End Property
 
 
-  Public ReadOnly Property FitsScriptPath As String
-    Get
-      Return Path.Combine(FitsHome, FitsScript)
-    End Get
-  End Property
-
-  Private _handlePassword As String = Nothing
   Public Property HandlePassword As String
     Get
-      If _handlePassword Is Nothing Then
-        Dim confSet As NameValueCollection = ConfigurationManager.GetSection("secretAppSettings")
-        _handlePassword = confSet.Item("Handle.Password")
-      End If
-      Return _handlePassword
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _handlePassword = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _fedoraAccount As String = Nothing
   Public Property FedoraAccount As String
     Get
-      If _fedoraAccount Is Nothing Then
-        Dim confSet As NameValueCollection = ConfigurationManager.GetSection("secretAppSettings")
-        _fedoraAccount = confSet.Item("Fedora.Account")
-      End If
-      Return _fedoraAccount
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _fedoraAccount = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _fedoraPassword As String = Nothing
   Public Property FedoraPassword As String
     Get
-      If _fedoraPassword Is Nothing Then
-        Dim confSet As NameValueCollection = ConfigurationManager.GetSection("secretAppSettings")
-        _fedoraPassword = confSet.Item("Fedora.Password")
-      End If
-      Return _fedoraPassword
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _fedoraPassword = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
 
-  Private _marcToModsXslt As String = Nothing
   Public Property MarcToModsXslt As String
     Get
-      If _marcToModsXslt Is Nothing Then
-        _marcToModsXslt = ConfigurationManager.AppSettings.Item("MarcToModsXslt")
-      End If
-      Return _marcToModsXslt
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _marcToModsXslt = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _dcRdfToModsXslt As String = Nothing
   Public Property DcRdfToModsXslt As String
     Get
-      If _dcRdfToModsXslt Is Nothing Then
-        _dcRdfToModsXslt = ConfigurationManager.AppSettings.Item("DcRdfToModsXslt")
-      End If
-      Return _dcRdfToModsXslt
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _dcRdfToModsXslt = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
-  Private _restartAtPath As String = Nothing
   Public Property RestartAtPath As String
     Get
-      If _restartAtPath Is Nothing Then
-        _restartAtPath = ConfigurationManager.AppSettings.Item("RestartAtPath")
-      End If
-      Return _restartAtPath
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
     Set(value As String)
-      _restartAtPath = value
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
 
   Public Const COPYRIGHT As String = "COPYRIGHT"
+  Public Const LICENSE As String = "LICENSE"
+  Public Const STATUTE As String = "STATUTE"
+  Public Const OTHER As String = "OTHER"
+
+  Public Shared ReadOnly Property ValidRightsBasis As String()
+    Get
+      Return {MedusaAppSettings.COPYRIGHT, MedusaAppSettings.LICENSE, MedusaAppSettings.OTHER, MedusaAppSettings.STATUTE}
+    End Get
+  End Property
 End Class
 
 Public Enum HandleGenerationType
