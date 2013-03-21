@@ -18,7 +18,7 @@ Public Class IdManager
   ''' <remarks></remarks>
   Public Shared Function GetHandle(uri As Uri) As String
     Dim hndl As String = ""
-    Using db As New MedusaDataContext(MedusaAppSettings.Settings.ConnectionString)
+    Using db As New MedusaDataContext(MedusaAppSettings.Settings.MedusaConnectionString)
 
       hndl = (From ha In db.HandleActions Where ha.target = uri.ToString Order By ha.id Descending Select ha.handle).FirstOrDefault
 
@@ -106,7 +106,7 @@ Public Class IdManager
   ''' <remarks></remarks>
   Public Shared Function GetMedusaIdentifier(humanId As String) As String
     Dim id As String = ""
-    Using db As New MedusaDataContext(MedusaAppSettings.Settings.ConnectionString)
+    Using db As New MedusaDataContext(MedusaAppSettings.Settings.MedusaConnectionString)
 
       id = (From i In db.IdentifierLookups Where i.HumanIdentifier = humanId Select i.MedusaIdentifier).SingleOrDefault
 
@@ -132,7 +132,7 @@ Public Class IdManager
   ''' <remarks></remarks>
   Public Shared Function GetHumanIdentifier(medusaId As String) As String
     Dim id As String = ""
-    Using db As New MedusaDataContext(MedusaAppSettings.Settings.ConnectionString)
+    Using db As New MedusaDataContext(MedusaAppSettings.Settings.MedusaConnectionString)
 
       id = (From i In db.IdentifierLookups Where i.MedusaIdentifier = medusaId Select i.HumanIdentifier).SingleOrDefault
 
@@ -150,7 +150,7 @@ Public Class IdManager
   ''' <remarks></remarks>
   Public Shared Function AddIdentifier(humanId As String, medusaId As String) As String
     Dim id As String = ""
-    Using db As New MedusaDataContext(MedusaAppSettings.Settings.ConnectionString)
+    Using db As New MedusaDataContext(MedusaAppSettings.Settings.MedusaConnectionString)
 
       id = (From i In db.IdentifierLookups Where i.HumanIdentifier = humanId Select i.MedusaIdentifier).SingleOrDefault
 

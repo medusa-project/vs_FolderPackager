@@ -16,6 +16,60 @@ Imports System.Security.Cryptography
 ''' <remarks></remarks>
 Public Class MedusaHelpers
 
+  ''' <summary>
+  ''' Uisng values from configuration, create Premis Rights Statement
+  ''' </summary>
+  ''' <param name="idType"></param>
+  ''' <param name="id"></param>
+  ''' <param name="premisObj"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public Shared Function GetPremisDisseminationRights(idType As String, id As String, premisObj As PremisObject) As PremisRights
+    Dim ret As PremisRights = Nothing
+
+    If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRights) Then
+      Dim pRgtStmt As New PremisRightsStatement(idType, id, MedusaAppSettings.Settings.PremisDisseminationRightsBasis)
+      pRgtStmt.RightsGranted.Add(New PremisRightsGranted(MedusaAppSettings.Settings.PremisDisseminationRights))
+      pRgtStmt.LinkToObject(premisObj)
+      If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions) Then
+        pRgtStmt.RightsGranted.FirstOrDefault.Restrictions.Add(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions)
+      End If
+      If MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.COPYRIGHT And
+        Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus) Then
+        Dim cpyRt As PremisCopyrightInformation
+        If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightJurisdiction) Then
+          cpyRt = New PremisCopyrightInformation(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus, "United States")
+        Else
+          cpyRt = New PremisCopyrightInformation(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus, MedusaAppSettings.Settings.PremisDisseminationCopyrightJurisdiction)
+        End If
+        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightNote) Then
+          cpyRt.CopyrightNotes.Add(MedusaAppSettings.Settings.PremisDisseminationCopyrightNote)
+        End If
+        pRgtStmt.CopyrightInformation = cpyRt
+
+      ElseIf MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.STATUTE And
+                    Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationStatuteCitation) Then
+        Dim stat As PremisStatuteInformation
+        If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationStatuteJurisdiction) Then
+          stat = New PremisStatuteInformation(MedusaAppSettings.Settings.PremisDisseminationStatuteCitation, "United States")
+        Else
+          stat = New PremisStatuteInformation(MedusaAppSettings.Settings.PremisDisseminationStatuteCitation, MedusaAppSettings.Settings.PremisDisseminationStatuteJurisdiction)
+        End If
+        pRgtStmt.StatuteInformation.Add(stat)
+
+      ElseIf MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.OTHER And
+                    Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationOtherRightsBasis) Then
+        Dim oth As New PremisOtherRightsInformation(MedusaAppSettings.Settings.PremisDisseminationOtherRightsBasis)
+        pRgtStmt.OtherRightsInformation = oth
+      End If
+
+      ret = New PremisRights(pRgtStmt)
+
+    End If
+
+    Return ret
+  End Function
+
   Public Shared Sub SavePremisContainer(pContainer As PremisContainer, destPath As String)
     Select Case MedusaAppSettings.Settings.SaveFilesAs
       Case SaveFileAsType.ONE
@@ -156,7 +210,7 @@ Public Class MedusaHelpers
           'metadata is kept with its related objects so do nothing
 
           Select Case r.RelationshipSubType
-            Case "HAS_ROOT", "MARC", "DC_RDF", "SPREADSHEET"
+            Case "MODS", "MARC", "DC_RDF", "SPREADSHEET", "CHECKSUMS", "IMAGE_TECH"
 
             Case Else
               Trace.TraceError(String.Format("Unexpected PREMIS Relationship Sub-type: {0}/{1}", r.RelationshipType, r.RelationshipSubType))
@@ -234,6 +288,30 @@ Public Class MedusaHelpers
 
             Case "PREVIOUS_SIBLING"
               'previous siblings should have already been created
+
+            Case "PARENT"
+              'parents should have already been created
+
+            Case Else
+              Trace.TraceError(String.Format("Unexpected PREMIS Relationship Sub-type: {0}/{1}", r.RelationshipType, r.RelationshipSubType))
+              Trace.Flush()
+              Throw New MedusaException(String.Format("Unexpected PREMIS Relationship Sub-type: {0}/{1}", r.RelationshipType, r.RelationshipSubType))
+
+          End Select
+
+        Case "PAGED_TEXT_ASSET"
+          Select Case r.RelationshipSubType
+            Case "PAGES"
+              'create subdirectory for this container
+              For Each o As PremisObject In r.RelatedObjects
+                MedusaHelpers.PartitionContainer(o, Path.Combine(rootDir, o.GetDefaultFileNameIndex), partList, persist)
+              Next
+
+            Case "TEI", "OCR", "HIRES_PDF", "OPTIMIZED_PDF"
+              'create subdirectory for this container
+              For Each o As PremisObject In r.RelatedObjects
+                MedusaHelpers.PartitionContainer(o, Path.Combine(rootDir, o.GetDefaultFileNameIndex), partList, persist)
+              Next
 
             Case "PARENT"
               'parents should have already been created
@@ -428,6 +506,20 @@ Public Class MedusaHelpers
       ret = "METADATA"
     ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.MetadataSpreadsheetRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataSpreadsheetRegex, RegexOptions.IgnoreCase) Then
       ret = "METADATA"
+    ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.ImageTechnicalMetadataRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.ImageTechnicalMetadataRegex, RegexOptions.IgnoreCase) Then
+      ret = "METADATA"
+    ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.Md5ManifestRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.Md5ManifestRegex, RegexOptions.IgnoreCase) Then
+      ret = "METADATA"
+
+    ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OcrTextRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.OcrTextRegex, RegexOptions.IgnoreCase) Then
+      ret = "PAGED_TEXT_ASSET"
+    ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.TeiXmlRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.TeiXmlRegex, RegexOptions.IgnoreCase) Then
+      ret = "PAGED_TEXT_ASSET"
+    ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.HighQualityPdfRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.HighQualityPdfRegex, RegexOptions.IgnoreCase) Then
+      ret = "PAGED_TEXT_ASSET"
+    ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OptimizedPdfRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.OptimizedPdfRegex, RegexOptions.IgnoreCase) Then
+      ret = "PAGED_TEXT_ASSET"
+
     End If
 
     Return ret
@@ -452,7 +544,23 @@ Public Class MedusaHelpers
         ret = "DC_RDF"
       ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.MetadataSpreadsheetRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.MetadataSpreadsheetRegex, RegexOptions.IgnoreCase) Then
         ret = "SPREADSHEET"
+      ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.ImageTechnicalMetadataRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.ImageTechnicalMetadataRegex, RegexOptions.IgnoreCase) Then
+        ret = "IMAGE_TECH"
+      ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.Md5ManifestRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.Md5ManifestRegex, RegexOptions.IgnoreCase) Then
+        ret = "CHECKSUMS"
       End If
+
+    ElseIf baseType = "PAGED_TEXT_ASSET" Then
+      If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OcrTextRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.OcrTextRegex, RegexOptions.IgnoreCase) Then
+        ret = "OCR"
+      ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.TeiXmlRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.TeiXmlRegex, RegexOptions.IgnoreCase) Then
+        ret = "TEI"
+      ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.HighQualityPdfRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.HighQualityPdfRegex, RegexOptions.IgnoreCase) Then
+        ret = "HIRES_PDF"
+      ElseIf Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OptimizedPdfRegex) AndAlso Regex.IsMatch(filename, MedusaAppSettings.Settings.OptimizedPdfRegex, RegexOptions.IgnoreCase) Then
+        ret = "OPTIMIZED_PDF"
+      End If
+
     End If
 
     Return ret
@@ -531,20 +639,22 @@ Public Class MedusaHelpers
   Public Shared Function CharacterizeFile(ByVal filepath As String, ByVal proposedMime As String) As PremisObjectCharacteristics
     'TODO: Make the FITS utility an option for this
 
-    Dim strm As Stream = File.OpenRead(filepath)
     Dim pObjChar As New PremisObjectCharacteristics()
 
     Dim alg As String = MedusaAppSettings.Settings.ChecksumAlgorithm
     Dim sha1 As HashAlgorithm = HashAlgorithm.Create(alg)
 
-    Dim hash() As Byte = sha1.ComputeHash(strm)
-
-    strm.Close()
+    If sha1 IsNot Nothing Then
+      Using strm As Stream = File.OpenRead(filepath)
+        Dim hash() As Byte = sha1.ComputeHash(strm)
+        strm.Close()
+        Dim pFix As New PremisFixity(alg, MetadataFunctions.BytesToHexStr(hash))
+        pObjChar.Fixities.Add(pFix)
+      End Using
+    End If
 
     Dim fInfo As New FileInfo(filepath)
 
-    Dim pFix As New PremisFixity(alg, MetadataFunctions.BytesToHexStr(hash))
-    pObjChar.Fixities.Add(pFix)
     pObjChar.Size = fInfo.Length
 
     Dim mime As String = MetadataFunctions.GetMimeFromFile(filepath, proposedMime)
@@ -552,8 +662,6 @@ Public Class MedusaHelpers
       Dim pForm As New PremisFormat(mime)
       pObjChar.Formats.Add(pForm)
     End If
-
-
 
     Return pObjChar
 

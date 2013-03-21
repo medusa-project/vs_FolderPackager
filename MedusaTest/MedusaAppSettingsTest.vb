@@ -699,6 +699,36 @@ Public Class MedusaAppSettingsTest
   End Sub
 
   '''<summary>
+  '''A test for PreservationLevel
+  '''</summary>
+  <TestMethod()> _
+  Public Sub PreservationLevelTest()
+    Dim expected As String = "PreservationLevel"
+    Dim actual As String = MedusaAppSettings.Settings.PreservationLevel
+    Assert.AreEqual(expected, actual)
+
+    expected = String.Format("{0}-{0}", expected)
+    MedusaAppSettings.Settings.PreservationLevel = expected
+    actual = MedusaAppSettings.Settings.PreservationLevel
+    Assert.AreEqual(expected, actual)
+  End Sub
+
+  '''<summary>
+  '''A test for PreservationLevelRationale
+  '''</summary>
+  <TestMethod()> _
+  Public Sub PreservationLevelRationaleTest()
+    Dim expected As String = "PreservationLevelRationale"
+    Dim actual As String = MedusaAppSettings.Settings.PreservationLevelRationale
+    Assert.AreEqual(expected, actual)
+
+    expected = String.Format("{0}-{0}", expected)
+    MedusaAppSettings.Settings.PreservationLevelRationale = expected
+    actual = MedusaAppSettings.Settings.PreservationLevelRationale
+    Assert.AreEqual(expected, actual)
+  End Sub
+
+  '''<summary>
   '''A test for PremisDisseminationCopyrightJurisdiction
   '''</summary>
   <TestMethod()> _
@@ -725,6 +755,36 @@ Public Class MedusaAppSettingsTest
     expected = String.Format("{0}-{0}", expected)
     MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus = expected
     actual = MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus
+    Assert.AreEqual(expected, actual)
+  End Sub
+
+  '''<summary>
+  '''A test for PremisDisseminationCopyrightNote
+  '''</summary>
+  <TestMethod()> _
+  Public Sub PremisDisseminationCopyrightNoteTest()
+    Dim expected As String = "PremisDisseminationCopyrightNote"
+    Dim actual As String = MedusaAppSettings.Settings.PremisDisseminationCopyrightNote
+    Assert.AreEqual(expected, actual)
+
+    expected = String.Format("{0}-{0}", expected)
+    MedusaAppSettings.Settings.PremisDisseminationCopyrightNote = expected
+    actual = MedusaAppSettings.Settings.PremisDisseminationCopyrightNote
+    Assert.AreEqual(expected, actual)
+  End Sub
+
+  '''<summary>
+  '''A test for PremisDisseminationOtherRightsBasis
+  '''</summary>
+  <TestMethod()> _
+  Public Sub PremisDisseminationOtherRightsBasisTest()
+    Dim expected As String = "PremisDisseminationOtherRightsBasis"
+    Dim actual As String = MedusaAppSettings.Settings.PremisDisseminationOtherRightsBasis
+    Assert.AreEqual(expected, actual)
+
+    expected = String.Format("{0}-{0}", expected)
+    MedusaAppSettings.Settings.PremisDisseminationOtherRightsBasis = expected
+    actual = MedusaAppSettings.Settings.PremisDisseminationOtherRightsBasis
     Assert.AreEqual(expected, actual)
   End Sub
 
@@ -869,6 +929,21 @@ Public Class MedusaAppSettingsTest
   '''A test for SourceFolder
   '''</summary>
   <TestMethod()> _
+  Public Sub PageFoldersRegexTest()
+    Dim expected As String = "PageFoldersRegex"
+    Dim actual As String = MedusaAppSettings.Settings.PageFoldersRegex
+    Assert.AreEqual(expected, actual)
+
+    expected = String.Format("{0}-{0}", expected)
+    MedusaAppSettings.Settings.PageFoldersRegex = expected
+    actual = MedusaAppSettings.Settings.PageFoldersRegex
+    Assert.AreEqual(expected, actual)
+  End Sub
+
+  '''<summary>
+  '''A test for SourceFolder
+  '''</summary>
+  <TestMethod()> _
   Public Sub SourceFolderTest()
     Dim expected As String = "SourceFolder"
     Dim actual As String = MedusaAppSettings.Settings.SourceFolder
@@ -879,6 +954,7 @@ Public Class MedusaAppSettingsTest
     actual = MedusaAppSettings.Settings.SourceFolder
     Assert.AreEqual(expected, actual)
   End Sub
+
 
   '''<summary>
   '''A test for WorkingFolder

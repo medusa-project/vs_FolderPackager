@@ -14,7 +14,7 @@ Public Class MedusaAppSettings
   'TODO: Would probably be good to rewrite this class to use a dictionary of values instead of a bunch of private variables
   Private _dict As Dictionary(Of String, String)
 
-  ' *** Here is the template for getting or setting appsettings string properties
+  ' *** Here is the template for getting or setting appsettings string properties; change to public and chaneg the name to match a appSettings key
   Private Property SomeSettingKey As String
     Get
       Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
@@ -95,6 +95,69 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
+  Public Property PageFoldersRegex As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+
+  Public Property ImageTechnicalMetadataRegex As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property Md5ManifestRegex As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property OcrTextRegex As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property HighQualityPdfRegex As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property OptimizedPdfRegex As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property TeiXmlRegex As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
 
   Public Property AgentsFolder As String
     Get
@@ -448,6 +511,24 @@ Public Class MedusaAppSettings
     End Set
   End Property
 
+  Public Property PremisDisseminationCopyrightNote As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property PremisDisseminationOtherRightsBasis As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
   Public Property PremisDisseminationRights As String
     Get
       Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
@@ -617,6 +698,25 @@ Public Class MedusaAppSettings
       Return {MedusaAppSettings.COPYRIGHT, MedusaAppSettings.LICENSE, MedusaAppSettings.OTHER, MedusaAppSettings.STATUTE}
     End Get
   End Property
+
+  Public Property PreservationLevel As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property PreservationLevelRationale As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
 End Class
 
 Public Enum HandleGenerationType
@@ -645,3 +745,4 @@ Public Enum ObjectAlreadyExistsType
   SKIP
   THROW_ERROR
 End Enum
+

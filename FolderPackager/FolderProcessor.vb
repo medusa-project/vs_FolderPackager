@@ -165,8 +165,8 @@ Public Class FolderProcessor
       If skipFolder = False Then
         pContainer = New PremisContainer(pRepresentation)
         pContainer.IDPrefix = handle & MedusaAppSettings.Settings.HandleLocalIdSeparator
-        Dim presLvl As New PremisPreservationLevel("BIT_LEVEL", Now)
-        presLvl.PreservationLevelRationale.Add("Uncategorized file system capture")
+        Dim presLvl As New PremisPreservationLevel(MedusaAppSettings.Settings.PreservationLevel, Now)
+        presLvl.PreservationLevelRationale.Add(MedusaAppSettings.Settings.PreservationLevelRationale)
         pRepresentation.PreservationLevels.Add(presLvl)
         pRepresentation.OriginalName = sourceFolder
 
@@ -208,19 +208,9 @@ Public Class FolderProcessor
           ProcessFolder(fld, destPath, pRepresentation)
         Next
 
-        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRights) Then
-          Dim pRgtStmt As New PremisRightsStatement("LOCAL", pContainer.NextID, MedusaAppSettings.Settings.PremisDisseminationRightsBasis)
-          pRgtStmt.RightsGranted.Add(New PremisRightsGranted(MedusaAppSettings.Settings.PremisDisseminationRights))
-          pRgtStmt.LinkToObject(pRepresentation)
-          If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions) Then
-            pRgtStmt.RightsGranted.FirstOrDefault.Restrictions.Add(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions)
-          End If
-          If MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.COPYRIGHT And
-            Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus) Then
-            Dim cpyRt As New PremisCopyrightInformation(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus, "United States")
-            pRgtStmt.CopyrightInformation = cpyRt
-          End If
-          Dim pRt As New PremisRights(pRgtStmt)
+        'create the premis rights statement for dissemination rights
+        Dim pRt As PremisRights = MedusaHelpers.GetPremisDisseminationRights("LOCAL", pContainer.NextID, pRepresentation)
+        If pRt IsNot Nothing Then
           pContainer.Rights.Add(pRt)
         End If
 
@@ -518,7 +508,7 @@ Public Class FolderProcessor
           modsObj.ObjectCharacteristics.Add(modsChar)
           modsObj.PreservationLevels.Add(New PremisPreservationLevel("DERIVATIVE_METADATA_FILE"))
 
-          parent.RelateToObject("METADATA", "HAS_ROOT", modsObj)
+          parent.RelateToObject("METADATA", "MODS", modsObj)
 
           'Add migration event and derivation relationship
           Dim modsEvt As New PremisEvent("LOCAL", pContainer.NextID, "MIGRATION")

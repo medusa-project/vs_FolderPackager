@@ -83,6 +83,40 @@ Public Class PremisContainerTest
     Assert.IsTrue(target.Events.Count = 2)
     Assert.IsTrue(target.Agents.Count = 1)
     Assert.IsTrue(target.Rights.Count = 0)
+
+    Dim rts As New PremisRightsStatement("LOCAL", "TEST:1234", "LICENSE")
+    Dim l As New PremisLicenseInformation("this is licensed")
+    rts.LicenseInformation = l
+
+    target.Rights.Add(New PremisRights(rts))
+
+    Assert.IsTrue(target.Rights.Count = 1)
+
+    Dim rts2 As New PremisRightsStatement("LOCAL", "TEST:1235", "STATUTE")
+    Dim s As New PremisStatuteInformation("Illinois", "Some State Law")
+    rts2.StatuteInformation.Add(s)
+
+    target.Rights.Add(New PremisRights(rts2))
+
+    Assert.IsTrue(target.Rights.Count = 2)
+
+    Dim rts3 As New PremisRightsStatement("LOCAL", "TEST:1236", "OTHER")
+    Dim oth As New PremisOtherRightsInformation("Just Because")
+    rts3.OtherRightsInformation = oth
+
+    target.Rights.Add(New PremisRights(rts3))
+
+    Assert.IsTrue(target.Rights.Count = 3)
+
+    target.Objects.First.LinkToRightsStatement(rts)
+    target.Objects.First.LinkToRightsStatement(rts2)
+    target.Objects.First.LinkToRightsStatement(rts3)
+
+
+    target.ValidateXML = True
+    'this will throw exception if resulting XMLK is not valid
+    Dim xml = target.GetXML
+
   End Sub
 
   '''<summary>

@@ -160,7 +160,7 @@ Public Class Processor
     pContainer.Events.Add(pEvt2)
 
 
-    pObj.RelateToObject("METADATA", "HAS_ROOT", pObj2)
+    pObj.RelateToObject("METADATA", "MODS", pObj2)
 
     If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRights) Then
       Dim pRgtStmt As New PremisRightsStatement("LOCAL", pContainer.NextID, MedusaAppSettings.Settings.PremisDisseminationRightsBasis)
