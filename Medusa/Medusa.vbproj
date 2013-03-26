@@ -65,6 +65,7 @@
   <ItemGroup>
     <Compile Include="MedusaAppSettings.vb" />
     <Compile Include="MedusaException.vb" />
+    <Compile Include="MedusaFullDsdBookPages.vb" />
     <Compile Include="MedusaHelpers.vb" />
     <Compile Include="My Project\AssemblyInfo.vb" />
     <Compile Include="My Project\Application.Designer.vb">

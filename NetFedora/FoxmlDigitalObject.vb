@@ -39,6 +39,16 @@ Public Class FoxmlDigitalObject
   Public Property DataStreams As List(Of FoxmlDatastream)
 
   Public Sub New(id As String)
+    'Taken from the Fedora documentation https://wiki.duraspace.org/display/FEDORA36/Fedora+Identifiers#FedoraIdentifiers-PIDspids 
+    Dim re As New RegularExpressions.Regex("^([A-Za-z0-9]|-|\.)+:(([A-Za-z0-9])|-|\.|~|_|(%[0-9A-F]{2}))+$")
+
+    If Not re.IsMatch(id) Then
+      Throw New FoxmlException(String.Format("PID '{0}' is not valid; does not match regular expression.", id))
+    End If
+    If id.Length > 64 Then
+      Throw New FoxmlException(String.Format("PID '{0}' is not valid; length is greater than 64.", id))
+    End If
+
     DataStreams = New List(Of FoxmlDatastream)
     _pid = id
   End Sub

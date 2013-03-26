@@ -9,6 +9,12 @@ Imports System.Reflection
 ''' <remarks></remarks>
 Public Class MedusaAppSettings
 
+  'define different rights
+  Public Const COPYRIGHT As String = "COPYRIGHT"
+  Public Const LICENSE As String = "LICENSE"
+  Public Const STATUTE As String = "STATUTE"
+  Public Const OTHER As String = "OTHER"
+
   Private Shared _thisInst As MedusaAppSettings
 
   'TODO: Would probably be good to rewrite this class to use a dictionary of values instead of a bunch of private variables
@@ -687,11 +693,6 @@ Public Class MedusaAppSettings
       SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
     End Set
   End Property
-
-  Public Const COPYRIGHT As String = "COPYRIGHT"
-  Public Const LICENSE As String = "LICENSE"
-  Public Const STATUTE As String = "STATUTE"
-  Public Const OTHER As String = "OTHER"
 
   Public Shared ReadOnly Property ValidRightsBasis As String()
     Get

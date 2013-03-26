@@ -84,6 +84,29 @@ Public Class FedoraObjectTest
   End Sub
 
   ''' <summary>
+  ''' Test the invalid PID exception
+  ''' </summary>
+  ''' <remarks></remarks>
+  <TestMethod()> _
+  <ExpectedException(GetType(FoxmlException))> _
+  Public Sub BadPidTest()
+    Dim badpid As String = "1234" 'missing colon
+    Dim foxMLObj As New FoxmlDigitalObject(badpid)
+  End Sub
+
+  ''' <summary>
+  ''' Test the invalid datastream id exception
+  ''' </summary>
+  ''' <remarks></remarks>
+  <TestMethod()> _
+  <ExpectedException(GetType(FoxmlException))> _
+  Public Sub BadDatastreamIdTest()
+    Dim badid As String = "test:1234" 'has a colon
+    Dim foxMLDS As New FoxmlDatastream(badid, ControlGroups.X)
+  End Sub
+
+
+  ''' <summary>
   ''' Test the creation and basic functionality of the FedoraObject class
   ''' </summary>
   ''' <remarks></remarks>
