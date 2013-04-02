@@ -559,7 +559,7 @@ Public Class FolderProcessor
 
     If modsObj IsNot Nothing Then
 
-      modsObj.ObjectIdentifiers.Add(New PremisIdentifier("FILENAME", modsFile))
+      modsObj.ObjectIdentifiers.Add(New PremisIdentifier("FILENAME", GetRelativePathTo(modsFile)))
 
       Dim modsChar = MedusaHelpers.CharacterizeFile(modsFile, "text/xml")
       modsObj.ObjectCharacteristics.Add(modsChar)
@@ -577,6 +577,7 @@ Public Class FolderProcessor
       modsEvt.LinkToAgent(pUserAgent)
 
       modsObj.RelateToObject("DERIVATION", "HAS_SOURCE", pObj, modsEvt)
+      pObj.RelateToObject("DERIVATION", "IS_SOURCE_OF", modsObj, modsEvt, False)
 
       pContainer.Objects.Add(modsObj)
       pContainer.Events.Add(modsEvt)

@@ -2,6 +2,7 @@
 Imports Uiuc.Library.Premis
 Imports Uiuc.Library.Medusa
 Imports Uiuc.Library.Ldap
+Imports Uiuc.Library.NetFedora
 Imports Uiuc.Library.MetadataUtilities
 Imports System.Text.RegularExpressions
 Imports System.Configuration
@@ -15,6 +16,9 @@ Imports System.Security.Cryptography
 ''' </summary>
 ''' <remarks></remarks>
 Public Class MedusaHelpers
+
+  Public Const MedusaNamespace As String = "http://medusa.library.illinois.edu/ns#"
+  Public Const PremisOwlNamespace As String = "http://multimedialab.elis.ugent.be/users/samcoppe/ontologies/Premis/premis.owl#"
 
   ''' <summary>
   ''' Uisng values from configuration, create Premis Rights Statement
@@ -87,14 +91,159 @@ Public Class MedusaHelpers
         'create directory structure and save a separate premis file for each fedora object as defined for our medusa content model
         'pContainer.SaveXML(Path.Combine(recPath, pContainer.Objects.First.GetDefaultFileName("test_premis_", "xml")))
         MedusaHelpers.SavePartitionedXML(pContainer, destPath, True)
+      Case SaveFileAsType.MEDUSA_FOXML
+        MedusaHelpers.SaveFoxml(pContainer, destPath)
       Case Else
-        'save one big premis file for the whole object
-        pContainer.SaveXML(Path.Combine(destPath, pContainer.Objects.First.GetDefaultFileName("premis_", "xml")))
+        Throw New MedusaException(String.Format("Unknown save format '{0}'", MedusaAppSettings.Settings.SaveFilesAs))
     End Select
 
   End Sub
 
+  ''' <summary>
+  ''' Save each PREMIS Entity to its own FoxML ingest package, converting all links and relationships into RELS-EXT
+  ''' </summary>
+  ''' <param name="cont"></param>
+  ''' <param name="origFolder"></param>
+  ''' <remarks></remarks>
+  Public Shared Sub SaveFoxml(cont As PremisContainer, origFolder As String)
+    If cont.PersistedEntityTypes.HasFlag(PremisEntityTypes.Objects) Then
+      For Each pr As PremisObject In cont.Objects
+        Dim fxObj As New FoxmlDigitalObject(pr.LocalIdentifierValue)
 
+        'Convert the PREMIS Object Links and Relationships into RELS_EXT and (maybe?) remove those links from the PREMIS Object
+        Dim relsext As New RelsExt(pr.LocalIdentifierValue)
+
+        For Each relat As PremisRelationship In pr.Relationships
+          For Each obj As PremisObject In relat.RelatedObjects
+            relsext.AddRelationship("medusa", String.Format("{0}.{1}", relat.RelationshipType, relat.RelationshipSubType),
+                                    MedusaHelpers.MedusaNamespace, obj.LocalIdentifierValue)
+          Next
+          'NOTE: PREMIS Relationships can also have a corresponding Premis Event; if we remove the relationship from the PREMIS document we also lose the
+          'correspondence of the event to the relationship
+          For Each evt As PremisEvent In relat.RelatedEvents
+            relsext.AddRelationship("medusa", String.Format("{0}.{1}.EVENT", relat.RelationshipType, relat.RelationshipSubType),
+                                    MedusaHelpers.MedusaNamespace, evt.EventIdentifier.IdentifierValue)
+          Next
+        Next
+
+        'linked events
+        For Each linkEvt As PremisEvent In pr.LinkedEvents
+          relsext.AddRelationship("premis", "linkingEvent",
+                                  MedusaHelpers.PremisOwlNamespace, linkEvt.EventIdentifier.IdentifierValue)
+        Next
+
+        'linked rights statements
+        For Each linkRts As PremisRightsStatement In pr.LinkedRightsStatements
+          relsext.AddRelationship("premis", "linkingRightsStatement",
+                                  MedusaHelpers.PremisOwlNamespace, linkRts.RightsStatementIdentifier.IdentifierValue)
+        Next
+
+        'linked intellectual entities
+        For Each intEntId As PremisIdentifier In pr.LinkedIntellectualEntityIdentifiers
+          relsext.AddRelationship("premis", "linkingIntellectualEntity ",
+                                  MedusaHelpers.PremisOwlNamespace, intEntId.IdentifierValue)
+        Next
+
+        fxObj.DataStreams.Add(relsext.Datastream)
+
+        'TODO: If this object is linked to a related DC or MODS metadata file then use that to create a DC datastream
+
+
+        Dim fxDS As New FoxmlDatastream("PREMIS-OBJECT", ControlGroups.X)
+        Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
+        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Object")
+        fxDS.DatastreamVersions.Add(fxDSV)
+        fxObj.DataStreams.Add(fxDS)
+
+        If pr.ObjectCategory = PremisObjectCategory.File Then
+          'TODO: add a datastream for the file and convert the FILENAME Identifier into a URL to use for this datastream
+          Dim fxDSFile As New FoxmlDatastream("FILE", ControlGroups.M)
+          Dim fldr As String = origFolder.Replace(MedusaAppSettings.Settings.WorkingFolder, MedusaAppSettings.Settings.WorkingUrl).Replace("\", "/")
+          Dim baseUrl As New Uri(New Uri(MedusaAppSettings.Settings.WorkingUrl), fldr & "/")
+          Dim url As New Uri(baseUrl, pr.GetFilenameIdentifier.IdentifierValue)
+          Dim fxDSFileV As New FoxmlDatastreamVersion(pr.ObjectCharacteristics.First.Formats.First.FormatName, url)
+          fxDSFile.DatastreamVersions.Add(fxDSFileV)
+          fxObj.DataStreams.Add(fxDSFile)
+        End If
+
+        'Save the XML
+        fxObj.ValidateXML = True
+        Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_", "xml"))
+        fxObj.SaveXML(fname)
+
+      Next
+    End If
+
+    If cont.PersistedEntityTypes.HasFlag(PremisEntityTypes.Events) Then
+      For Each pr As PremisEvent In cont.Events
+        Dim fxEvt As New FoxmlDigitalObject(pr.EventIdentifier.IdentifierValue)
+
+        'Convert the PREMIS Object Links and Relationships into RELS_EXT and (maybe?) remove those links from the PREMIS Object
+        Dim relsext As New RelsExt(pr.EventIdentifier.IdentifierValue)
+
+        'linked events
+        For Each kvp As KeyValuePair(Of PremisObject, List(Of String)) In pr.LinkedObjects
+          If kvp.Value.Count = 0 Then
+            relsext.AddRelationship("premis", "linkingObject",
+                                    MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+          Else
+            For Each role In kvp.Value
+              relsext.AddRelationship("medusa", String.Format("linkingObject.{0}", role),
+                                      MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+            Next
+          End If
+
+        Next
+
+        'linked agents
+        For Each kvp As KeyValuePair(Of PremisAgent, List(Of String)) In pr.LinkedAgents
+          If kvp.Value.Count = 0 Then
+            relsext.AddRelationship("premis", "linkingAgent",
+                                    MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+          Else
+            For Each role In kvp.Value
+              relsext.AddRelationship("medusa", String.Format("linkingAgent.{0}", role),
+                                      MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+            Next
+          End If
+
+        Next
+
+        fxEvt.DataStreams.Add(relsext.Datastream)
+
+        'create premis-event datastream
+        Dim fxDS As New FoxmlDatastream("PREMIS-EVENT", ControlGroups.X)
+        Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
+        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Event")
+        fxDS.DatastreamVersions.Add(fxDSV)
+        fxEvt.DataStreams.Add(fxDS)
+
+        'save file
+        fxEvt.ValidateXML = True
+        Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_", "xml"))
+        fxEvt.SaveXML(fname)
+
+      Next
+    End If
+
+    If cont.PersistedEntityTypes.HasFlag(PremisEntityTypes.Agents) Then
+      For Each pr As PremisAgent In cont.Agents
+
+      Next
+    End If
+
+    If cont.PersistedEntityTypes.HasFlag(PremisEntityTypes.Rights) Then
+      For Each pr As PremisRights In cont.Rights
+
+      Next
+    End If
+
+  End Sub
+
+  Public Function CamelCase(s As String) As String
+    Dim ret As String = s
+    Return ret
+  End Function
 
   ''' <summary>
   '''  This function partitions the given premisContainer and then saves a separate XML file for each grouping of files according to the Medusa content models

@@ -215,6 +215,7 @@ Public Class OaiDc
       Dim xmlDoc As New XmlDocument
       Using writer As XmlWriter = xmlDoc.CreateNavigator.AppendChild
         Me.GetXml(writer)
+        writer.Close()
       End Using
       Return xmlDoc
     End Get

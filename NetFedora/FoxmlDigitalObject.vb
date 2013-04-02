@@ -1,6 +1,8 @@
 ﻿Imports System.Xml
 Imports System.Xml.Schema
 Imports System.Text
+Imports System.IO
+Imports System.ComponentModel
 
 Public Class FoxmlDigitalObject
   Public Property ValidateXML As Boolean = True
@@ -36,7 +38,37 @@ Public Class FoxmlDigitalObject
     End Get
   End Property
 
-  Public Property DataStreams As List(Of FoxmlDatastream)
+  Public Property DataStreams As BindingList(Of FoxmlDatastream)
+
+  ''' <summary>
+  ''' Update the parent of the item being added to the datastream list
+  ''' </summary>
+  ''' <param name="sender"></param>
+  ''' <param name="e"></param>
+  ''' <remarks></remarks>
+  Private Sub DataStreams_Changed(ByVal sender As Object, ByVal e As ListChangedEventArgs)
+    Select Case e.ListChangedType
+      Case ListChangedType.ItemAdded
+        'set the parent of the added DS to this object
+        Dim ds As FoxmlDatastream = DataStreams.Item(e.NewIndex)
+        ds.ParentDigitalObject = Me
+
+      Case ListChangedType.ItemDeleted
+        'This is really not very useful since the item has already been deleted once this event fires, 
+        'May not really be neccisary to do anything anyway since once a DS is removed it will probably be discarded
+        'and if it isn't discarded it might be attached to a different object in which case its parent will be
+        'updated at that point
+
+      Case ListChangedType.Reset
+        'reset all the parent pointers to this object
+        For Each ds As FoxmlDatastream In Me.DataStreams
+          ds.ParentDigitalObject = Me
+        Next
+
+    End Select
+
+  End Sub
+
 
   Public Sub New(id As String)
     'Taken from the Fedora documentation https://wiki.duraspace.org/display/FEDORA36/Fedora+Identifiers#FedoraIdentifiers-PIDspids 
@@ -49,12 +81,15 @@ Public Class FoxmlDigitalObject
       Throw New FoxmlException(String.Format("PID '{0}' is not valid; length is greater than 64.", id))
     End If
 
-    DataStreams = New List(Of FoxmlDatastream)
+    DataStreams = New BindingList(Of FoxmlDatastream)
+    AddHandler DataStreams.ListChanged, AddressOf DataStreams_Changed
+
     _pid = id
   End Sub
 
   Public Sub New(elem As XmlElement)
-    DataStreams = New List(Of FoxmlDatastream)
+    DataStreams = New BindingList(Of FoxmlDatastream)
+    AddHandler DataStreams.ListChanged, AddressOf DataStreams_Changed
 
     If elem.NamespaceURI <> FedoraObject.FoxmlNamespace Or elem.LocalName <> "digitalObject" Then
       Throw New FoxmlException("The document element must be <foxml:digitalObject>.")
@@ -179,6 +214,21 @@ Public Class FoxmlDigitalObject
     Return xmlStr
 
   End Function
+
+  ''' <summary>
+  ''' Save the Premis Container as a single XML file
+  ''' </summary>
+  ''' <param name="fileName"></param>
+  ''' <remarks></remarks>
+  Public Sub SaveXML(ByVal fileName As String)
+    Dim xmlStr As String = Me.GetXML
+
+    Using txtWr As New StreamWriter(fileName, False, Encoding.UTF8)
+      txtWr.Write(xmlStr)
+      txtWr.Close()
+    End Using
+
+  End Sub
 
   Private Sub Validate(ByVal xmlStr As String)
 

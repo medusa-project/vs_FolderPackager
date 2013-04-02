@@ -17,7 +17,7 @@ Public Class MedusaAppSettings
 
   Private Shared _thisInst As MedusaAppSettings
 
-  'TODO: Would probably be good to rewrite this class to use a dictionary of values instead of a bunch of private variables
+  'DONE: Would probably be good to rewrite this class to use a dictionary of values instead of a bunch of private variables
   Private _dict As Dictionary(Of String, String)
 
   ' *** Here is the template for getting or setting appsettings string properties; change to public and chaneg the name to match a appSettings key
@@ -371,6 +371,15 @@ Public Class MedusaAppSettings
   End Property
 
   Public Property WorkingFolder As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property WorkingUrl As String
     Get
       Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
@@ -733,6 +742,7 @@ Public Enum SaveFileAsType
   REPRESENTATIONS
   MEDUSA
   MEDUSA_MULTIPLE
+  MEDUSA_FOXML
 End Enum
 
 Public Enum PackageModeType

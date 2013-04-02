@@ -1,5 +1,6 @@
 ﻿Imports System.Xml
 Imports System.Text
+Imports System.ComponentModel
 
 Public Class FoxmlDatastream
 
@@ -23,7 +24,36 @@ Public Class FoxmlDatastream
 
   Public Property Versionable As Boolean?
 
-  Public Property DatastreamVersions As List(Of FoxmlDatastreamVersion)
+  Public Property DatastreamVersions As BindingList(Of FoxmlDatastreamVersion)
+
+  ''' <summary>
+  ''' Update the parent of the item being added to the datastream list
+  ''' </summary>
+  ''' <param name="sender"></param>
+  ''' <param name="e"></param>
+  ''' <remarks></remarks>
+  Private Sub DatastreamVersions_Changed(ByVal sender As Object, ByVal e As ListChangedEventArgs)
+    Select Case e.ListChangedType
+      Case ListChangedType.ItemAdded
+        'set the parent of the added DS to this object
+        Dim dsv As FoxmlDatastreamVersion = DatastreamVersions.Item(e.NewIndex)
+        dsv.ParentDatastream = Me
+
+      Case ListChangedType.ItemDeleted
+        'This is really not very useful since the item has already been deleted once this event fires, 
+        'May not really be neccisary to do anything anyway since once a DS is removed it will probably be discarded
+        'and if it isn't discarded it might be attached to a different object in which case its parent will be
+        'updated at that point
+
+      Case ListChangedType.Reset
+        'reset all the parent pointers to this object
+        For Each dsv As FoxmlDatastreamVersion In Me.DatastreamVersions
+          dsv.ParentDatastream = Me
+        Next
+
+    End Select
+
+  End Sub
 
   Public Sub New(id As String, controlGroup As ControlGroups)
     'XML NCNAME (except does not support Unicode in the supplemenatary range \u10000-\ueffff )
@@ -37,7 +67,8 @@ Public Class FoxmlDatastream
       Throw New FoxmlException(String.Format("ID '{0}' is not valid; length is greater than 64.", id))
     End If
 
-    DatastreamVersions = New List(Of FoxmlDatastreamVersion)
+    DatastreamVersions = New BindingList(Of FoxmlDatastreamVersion)
+    AddHandler DatastreamVersions.ListChanged, AddressOf DatastreamVersions_Changed
     _id = id
     _controlGroup = controlGroup
   End Sub
@@ -64,7 +95,8 @@ Public Class FoxmlDatastream
   End Sub
 
   Public Sub New(elem As XmlElement)
-    DatastreamVersions = New List(Of FoxmlDatastreamVersion)
+    DatastreamVersions = New BindingList(Of FoxmlDatastreamVersion)
+    AddHandler DatastreamVersions.ListChanged, AddressOf DatastreamVersions_Changed
 
     If elem.NamespaceURI <> FedoraObject.FoxmlNamespace Or elem.LocalName <> "datastream" Then
       Throw New FoxmlException("The starting element must be <foxml:datastream>.")

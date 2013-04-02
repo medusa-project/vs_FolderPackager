@@ -1,6 +1,7 @@
 ﻿Imports Uiuc.Library.NetFedora.ApiA
 Imports Uiuc.Library.NetFedora.ApiM
-Imports Uiuc.Library.Medusa
+Imports System.Collections.Specialized
+Imports System.Configuration
 
 Public Class FedoraRepository
 
@@ -14,7 +15,7 @@ Public Class FedoraRepository
   Public Shared MaxSearchResults As Integer = 100 'the maximum size of a search result returned by a single find or resume request
 
   Public Sub New()
-    Me.New("Fedora-API-A-Service-HTTP-Port", "Fedora-API-M-Service-HTTP-Port", MedusaAppSettings.Settings.FedoraAccount, MedusaAppSettings.Settings.FedoraPassword)
+    Me.New("Fedora-API-A-Service-HTTP-Port", "Fedora-API-M-Service-HTTP-Port", Nothing, Nothing)
   End Sub
 
   Public Sub New(userId As String, password As String)
@@ -22,6 +23,19 @@ Public Class FedoraRepository
   End Sub
 
   Public Sub New(aPort As String, mPort As String, userId As String, password As String)
+
+    Dim confSet As NameValueCollection = ConfigurationManager.GetSection("secretAppSettings")
+    If userId Is Nothing Then
+      If confSet IsNot Nothing AndAlso confSet.AllKeys.Contains("FedoraAccount") Then
+        userId = confSet.Item("FedoraAccount")
+      End If
+    End If
+    If password Is Nothing Then
+      If confSet IsNot Nothing AndAlso confSet.AllKeys.Contains("FedoraPassword") Then
+        password = confSet.Item("FedoraPassword")
+      End If
+    End If
+
     _repoA = New FedoraAPIAClient(aPort)
 
     _repoA.ClientCredentials.UserName.UserName = userId

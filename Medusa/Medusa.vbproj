@@ -115,6 +115,10 @@
       <Project>{164a9d55-4f5b-4b32-8d4c-90f044936fca}</Project>
       <Name>PREMIS</Name>
     </ProjectReference>
+    <ProjectReference Include="..\NetFedora\NetFedora.vbproj">
+      <Project>{5bab8a19-a3a4-4604-aa6f-3e42ca74922b}</Project>
+      <Name>NetFedora</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

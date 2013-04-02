@@ -2,7 +2,8 @@
 Imports System.Xml.Schema
 
 Public Class RelsExt
-  Public Const RdfNamespace = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  Public Const RdfNamespace As String = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  Public Const RelsExtUri As String = "info:fedora/fedora-system:FedoraRELSExt-1.0"
 
   Private subjectUri As Uri
   Public ReadOnly Property Subject As Uri
@@ -164,6 +165,7 @@ Public Class RelsExt
       Dim xmlDoc As New XmlDocument
       Using writer As XmlWriter = xmlDoc.CreateNavigator.AppendChild
         Me.GetXml(writer)
+        writer.Close()
       End Using
       Return xmlDoc
     End Get
@@ -200,5 +202,17 @@ Public Class RelsExt
     End Property
 
   End Class
+
+  Public ReadOnly Property Datastream As FoxmlDatastream
+    Get
+      Dim fxDSRelsExt As New FoxmlDatastream("RELS-EXT", ControlGroups.X)
+      Dim fxDSRelsExtV As New FoxmlDatastreamVersion("application/rdf+xml", Me.Xml)
+      fxDSRelsExtV.FormatUri = New Uri(RelsExt.RelsExtUri)
+
+      fxDSRelsExt.DatastreamVersions.Add(fxDSRelsExtV)
+
+      Return fxDSRelsExt
+    End Get
+  End Property
 
 End Class
