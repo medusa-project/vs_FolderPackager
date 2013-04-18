@@ -63,76 +63,76 @@ Public Class OaiDc
     Me.New()
 
     Dim xmlns As New XmlNamespaceManager(elem.OwnerDocument.NameTable)
-    xmlns.AddNamespace("dc", OaiDc.OaiDcNamespace)
+    xmlns.AddNamespace("dc", OaiDc.DcNamespace)
 
     Dim nds As XmlNodeList
 
-    nds = elem.SelectNodes("*//dc:contributor", xmlns)
+    nds = elem.SelectNodes(".//dc:contributor", xmlns)
     For Each nd As XmlElement In nds
       Me.Contributors.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:coverage", xmlns)
+    nds = elem.SelectNodes(".//dc:coverage", xmlns)
     For Each nd As XmlElement In nds
       Me.Coverages.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:creator", xmlns)
+    nds = elem.SelectNodes(".//dc:creator", xmlns)
     For Each nd As XmlElement In nds
       Me.Creators.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:description", xmlns)
+    nds = elem.SelectNodes(".//dc:description", xmlns)
     For Each nd As XmlElement In nds
       Me.Descriptions.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:format", xmlns)
+    nds = elem.SelectNodes(".//dc:format", xmlns)
     For Each nd As XmlElement In nds
       Me.Formats.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:identifier", xmlns)
+    nds = elem.SelectNodes(".//dc:identifier", xmlns)
     For Each nd As XmlElement In nds
       Me.Identifiers.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:language", xmlns)
+    nds = elem.SelectNodes(".//dc:language", xmlns)
     For Each nd As XmlElement In nds
       Me.Languages.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:publisher", xmlns)
+    nds = elem.SelectNodes(".//dc:publisher", xmlns)
     For Each nd As XmlElement In nds
       Me.Publishers.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:relation", xmlns)
+    nds = elem.SelectNodes(".//dc:relation", xmlns)
     For Each nd As XmlElement In nds
       Me.Relations.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:rights", xmlns)
+    nds = elem.SelectNodes(".//dc:rights", xmlns)
     For Each nd As XmlElement In nds
       Me.Rights.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:source", xmlns)
+    nds = elem.SelectNodes(".//dc:source", xmlns)
     For Each nd As XmlElement In nds
       Me.Sources.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:subject", xmlns)
+    nds = elem.SelectNodes(".//dc:subject", xmlns)
     For Each nd As XmlElement In nds
       Me.Subjects.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:title", xmlns)
+    nds = elem.SelectNodes(".//dc:title", xmlns)
     For Each nd As XmlElement In nds
       Me.Titles.Add(nd.InnerText)
     Next
 
-    nds = elem.SelectNodes("*//dc:type", xmlns)
+    nds = elem.SelectNodes(".//dc:type", xmlns)
     For Each nd As XmlElement In nds
       Me.Types.Add(nd.InnerText)
     Next
@@ -218,6 +218,17 @@ Public Class OaiDc
         writer.Close()
       End Using
       Return xmlDoc
+    End Get
+  End Property
+
+  Public ReadOnly Property Datastream As FoxmlDatastream
+    Get
+      Dim fxDSDc As New FoxmlDatastream("DC", ControlGroups.X)
+      Dim fxDSVDc As New FoxmlDatastreamVersion("text/xml", Me.Xml)
+      fxDSVDc.Label = "Dublin Core Metadata"
+      fxDSVDc.FormatUri = New Uri(OaiDc.OaiDcNamespace)
+      fxDSDc.DatastreamVersions.Add(fxDSVDc)
+      Return fxDSDc
     End Get
   End Property
 

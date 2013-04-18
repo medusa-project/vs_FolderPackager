@@ -9,6 +9,24 @@ Imports System.Reflection
 ''' <remarks></remarks>
 Public Class MedusaAppSettings
 
+  ''' <summary>
+  ''' Return the Fedora Checksum algoithm normaqlized for use in the Fedora ContentDigest type 
+  ''' </summary>
+  ''' <value></value>
+  ''' <returns></returns>
+  ''' <remarks>The .NET libraries use 'SHA1' while Fedora (and Java) use 'SHA-1'; other names seem to correspond OK</remarks>
+  Public ReadOnly Property FedoraChecksumAlgorithmNormalized
+    Get
+      Dim ret As String = Me.FedoraChecksumAlgorithm
+      If ret.ToUpper = "SHA1" Then
+        ret = "SHA-1"
+      ElseIf ret.ToUpper = "NONE" Then
+        ret = "Disabled"
+      End If
+      Return ret
+    End Get
+  End Property
+
   'define different rights
   Public Const COPYRIGHT As String = "COPYRIGHT"
   Public Const LICENSE As String = "LICENSE"
@@ -278,6 +296,15 @@ Public Class MedusaAppSettings
   End Property
 
   Public Property ChecksumAlgorithm As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property FedoraChecksumAlgorithm As String
     Get
       Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get
@@ -686,6 +713,15 @@ Public Class MedusaAppSettings
   End Property
 
   Public Property DcRdfToModsXslt As String
+    Get
+      Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
+    End Get
+    Set(value As String)
+      SetValue(MethodBase.GetCurrentMethod.Name.Substring(4), value)
+    End Set
+  End Property
+
+  Public Property ModsToDcXslt As String
     Get
       Return GetValue(MethodBase.GetCurrentMethod.Name.Substring(4))
     End Get

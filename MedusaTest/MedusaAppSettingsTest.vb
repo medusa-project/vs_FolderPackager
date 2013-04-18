@@ -95,6 +95,21 @@ Public Class MedusaAppSettingsTest
   End Sub
 
   '''<summary>
+  '''A test for FedoraChecksumAlgorithm
+  '''</summary>
+  <TestMethod()> _
+  Public Sub FedoraChecksumAlgorithm()
+    Dim expected As String = "FedoraChecksumAlgorithm"
+    Dim actual As String = MedusaAppSettings.Settings.FedoraChecksumAlgorithm
+    Assert.AreEqual(expected, actual)
+
+    expected = String.Format("{0}-{0}", expected)
+    MedusaAppSettings.Settings.FedoraChecksumAlgorithm = expected
+    actual = MedusaAppSettings.Settings.FedoraChecksumAlgorithm
+    Assert.AreEqual(expected, actual)
+  End Sub
+
+  '''<summary>
   '''A test for CollectionDescriptionPath
   '''</summary>
   <TestMethod()> _
@@ -560,6 +575,21 @@ Public Class MedusaAppSettingsTest
     expected = String.Format("{0}-{0}", expected)
     MedusaAppSettings.Settings.MarcToModsXslt = expected
     actual = MedusaAppSettings.Settings.MarcToModsXslt
+    Assert.AreEqual(expected, actual)
+  End Sub
+
+  '''<summary>
+  '''A test for ModsToDcXslt
+  '''</summary>
+  <TestMethod()> _
+  Public Sub ModsToDcXsltTest()
+    Dim expected As String = "ModsToDcXslt"
+    Dim actual As String = MedusaAppSettings.Settings.ModsToDcXslt
+    Assert.AreEqual(expected, actual)
+
+    expected = String.Format("{0}-{0}", expected)
+    MedusaAppSettings.Settings.ModsToDcXslt = expected
+    actual = MedusaAppSettings.Settings.ModsToDcXslt
     Assert.AreEqual(expected, actual)
   End Sub
 

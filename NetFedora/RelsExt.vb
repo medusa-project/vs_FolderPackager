@@ -4,6 +4,7 @@ Imports System.Xml.Schema
 Public Class RelsExt
   Public Const RdfNamespace As String = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
   Public Const RelsExtUri As String = "info:fedora/fedora-system:FedoraRELSExt-1.0"
+  Public Const DefaultContentModel As String = "fedora-system:FedoraObject-3.0"
 
   Private subjectUri As Uri
   Public ReadOnly Property Subject As Uri
@@ -11,6 +12,7 @@ Public Class RelsExt
       Return subjectUri
     End Get
   End Property
+
   Public ReadOnly Property Pid As String
     Get
       Dim ret As String = ""
@@ -22,6 +24,8 @@ Public Class RelsExt
       Return ret
     End Get
   End Property
+
+  Public Property IncludeDefaultContentModel As Boolean = True
 
   Private xmlns As XmlNamespaceManager
 
@@ -68,6 +72,10 @@ Public Class RelsExt
     subjectUri = New Uri(String.Format("{0}{1}", FedoraObject.FedoraUriPrefix, pid))
     xmlns = New XmlNamespaceManager(New NameTable)
     relats = New List(Of RdfPredicateObject)
+
+    If Me.IncludeDefaultContentModel = True Then
+      Me.AddContentModel(RelsExt.DefaultContentModel)
+    End If
   End Sub
 
   ''' <summary>
@@ -106,7 +114,16 @@ Public Class RelsExt
       Throw New FedoraException("RelsExt XML is missing rdf:Description")
     End If
 
+    'if the default content model is missing then add it
+    If Me.IncludeDefaultContentModel = True And Not Me.GetRelatedObjectPids("hasModel", FedoraObject.FedoraModelNamespace).Any(Function(n) n = RelsExt.DefaultContentModel) Then
+      Me.AddContentModel(RelsExt.DefaultContentModel)
+    End If
 
+
+  End Sub
+
+  Public Sub AddContentModel(modelPid As String)
+    Me.AddRelationship("fedora-model", "hasModel", FedoraObject.FedoraModelNamespace, modelPid)
   End Sub
 
 
@@ -207,6 +224,7 @@ Public Class RelsExt
     Get
       Dim fxDSRelsExt As New FoxmlDatastream("RELS-EXT", ControlGroups.X)
       Dim fxDSRelsExtV As New FoxmlDatastreamVersion("application/rdf+xml", Me.Xml)
+      fxDSRelsExtV.Label = "RDF Relationships"
       fxDSRelsExtV.FormatUri = New Uri(RelsExt.RelsExtUri)
 
       fxDSRelsExt.DatastreamVersions.Add(fxDSRelsExtV)

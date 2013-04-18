@@ -172,6 +172,7 @@
     <Content Include="MARC21slim2MODS3-4.xsl">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="MODS3-4_DC_XSLT1-0.xsl" />
     <Content Include="secret.config">
       <SubType>Designer</SubType>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>

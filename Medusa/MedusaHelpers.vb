@@ -10,6 +10,8 @@ Imports System.Runtime.InteropServices
 Imports System.Security
 Imports System.Net.Mail
 Imports System.Security.Cryptography
+Imports System.Xml.Xsl
+Imports System.Xml
 
 ''' <summary>
 ''' In order to keep the core Premis classes as generic as possible, any code that is unique to the Medusa Repository project should go here.
@@ -17,11 +19,13 @@ Imports System.Security.Cryptography
 ''' <remarks></remarks>
 Public Class MedusaHelpers
 
+  Private Shared ModsToDcXslt As XslCompiledTransform
+
   Public Const MedusaNamespace As String = "http://medusa.library.illinois.edu/ns#"
   Public Const PremisOwlNamespace As String = "http://multimedialab.elis.ugent.be/users/samcoppe/ontologies/Premis/premis.owl#"
 
   ''' <summary>
-  ''' Uisng values from configuration, create Premis Rights Statement
+  ''' Using values from configuration, create Premis Rights Statement
   ''' </summary>
   ''' <param name="idType"></param>
   ''' <param name="id"></param>
@@ -110,10 +114,19 @@ Public Class MedusaHelpers
       For Each pr As PremisObject In cont.Objects
         Dim fxObj As New FoxmlDigitalObject(pr.LocalIdentifierValue)
 
+        Dim prDSVLabel As String = "Root"
+        Dim objLabel As String = pr.ObjectCategory.ToString
+
+        'TODO: Derive a meaninful label for each object, possibly by concating preservationLevelValue of root object and the relat type whose relat sub-type is PARENT???
+
         'Convert the PREMIS Object Links and Relationships into RELS_EXT and (maybe?) remove those links from the PREMIS Object
         Dim relsext As New RelsExt(pr.LocalIdentifierValue)
 
         For Each relat As PremisRelationship In pr.Relationships
+          If relat.RelationshipSubType = "PARENT" Then
+            prDSVLabel = relat.RelationshipType
+          End If
+
           For Each obj As PremisObject In relat.RelatedObjects
             relsext.AddRelationship("medusa", String.Format("{0}.{1}", relat.RelationshipType, relat.RelationshipSubType),
                                     MedusaHelpers.MedusaNamespace, obj.LocalIdentifierValue)
@@ -121,54 +134,144 @@ Public Class MedusaHelpers
           'NOTE: PREMIS Relationships can also have a corresponding Premis Event; if we remove the relationship from the PREMIS document we also lose the
           'correspondence of the event to the relationship
           For Each evt As PremisEvent In relat.RelatedEvents
-            relsext.AddRelationship("medusa", String.Format("{0}.{1}.EVENT", relat.RelationshipType, relat.RelationshipSubType),
-                                    MedusaHelpers.MedusaNamespace, evt.EventIdentifier.IdentifierValue)
+            If IncludeEvent(evt) Then
+              relsext.AddRelationship("medusa", String.Format("{0}.{1}.linkingEvent", relat.RelationshipType, relat.RelationshipSubType),
+                                      MedusaHelpers.MedusaNamespace, evt.LocalIdentifierValue)
+            End If
           Next
+
+          'If this object is linked to a related MODS metadata file then use that to create a DC datastream
+          If relat.RelationshipType = "METADATA" And relat.RelationshipSubType = "MODS" Then
+            'convert the mods into dc for inclusion in a FoxML DC datastream
+
+            'get modstodc xslt
+            If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.ModsToDcXslt) Then
+
+              If ModsToDcXslt Is Nothing Then
+                Dim xsltFile As String = ""
+                xsltFile = MedusaAppSettings.Settings.ModsToDcXslt
+                Dim xslt As New XslCompiledTransform()
+                xslt.Load(xsltFile)
+                ModsToDcXslt = xslt
+              End If
+
+              For Each obj As PremisObject In relat.RelatedObjects
+                Dim fn As String = Path.Combine(origFolder, obj.GetFilenameIdentifier.IdentifierValue)
+                'Apply xslt to fn and return result as xmldocument
+                Dim xmldc As New XmlDocument
+                Using writer As XmlWriter = xmldc.CreateNavigator.AppendChild
+                  ModsToDcXslt.Transform(fn, writer)
+                  writer.Close()
+                End Using
+
+
+                'Instantiate new OaiDc class using the xmldocument.rootelement
+                Dim oaidc As New OaiDc(xmldc.DocumentElement)
+
+                If oaidc.Titles.Count > 0 Then
+                  objLabel = oaidc.Titles.First
+                End If
+
+                fxObj.DataStreams.Add(oaidc.Datastream)
+              Next
+
+            End If
+
+
+          End If
+
         Next
+
+        'if foxml object does not yet have label, derive one from different values in the premis and metadata
+        If String.IsNullOrWhiteSpace(fxObj.Label) Then
+          If pr.PreservationLevels.Count > 0 And Not String.IsNullOrWhiteSpace(pr.OriginalName) And Not String.IsNullOrWhiteSpace(objLabel) Then
+            fxObj.Label = String.Format("{0}: '{1}' ({2})", pr.PreservationLevels.First.PreservationLevelValue, objLabel, pr.OriginalName)
+          ElseIf pr.PreservationLevels.Count > 0 And String.IsNullOrWhiteSpace(pr.OriginalName) And Not String.IsNullOrWhiteSpace(objLabel) Then
+            fxObj.Label = String.Format("{0}: '{1}'", pr.PreservationLevels.First.PreservationLevelValue, objLabel)
+          ElseIf pr.PreservationLevels.Count > 0 And Not String.IsNullOrWhiteSpace(pr.OriginalName) And String.IsNullOrWhiteSpace(objLabel) Then
+            fxObj.Label = String.Format("{0}: ({1})", pr.PreservationLevels.First.PreservationLevelValue, pr.OriginalName)
+          ElseIf pr.PreservationLevels.Count = 0 And Not String.IsNullOrWhiteSpace(pr.OriginalName) And Not String.IsNullOrWhiteSpace(objLabel) Then
+            fxObj.Label = String.Format("'{0}' ({1})", objLabel, pr.OriginalName)
+          ElseIf pr.PreservationLevels.Count = 0 And String.IsNullOrWhiteSpace(pr.OriginalName) And Not String.IsNullOrWhiteSpace(objLabel) Then
+            fxObj.Label = String.Format("'{0}'", objLabel)
+          ElseIf pr.PreservationLevels.Count > 0 And String.IsNullOrWhiteSpace(pr.OriginalName) And String.IsNullOrWhiteSpace(objLabel) Then
+            fxObj.Label = String.Format("{0}", pr.PreservationLevels.First.PreservationLevelValue)
+          ElseIf pr.PreservationLevels.Count = 0 And Not String.IsNullOrWhiteSpace(pr.OriginalName) And String.IsNullOrWhiteSpace(objLabel) Then
+            fxObj.Label = String.Format("({0})", pr.OriginalName)
+          End If
+
+        End If
+
+        pr.Relationships.Clear()
 
         'linked events
         For Each linkEvt As PremisEvent In pr.LinkedEvents
-          relsext.AddRelationship("premis", "linkingEvent",
-                                  MedusaHelpers.PremisOwlNamespace, linkEvt.EventIdentifier.IdentifierValue)
+          If IncludeEvent(linkEvt) Then
+            relsext.AddRelationship("premis", "linkingEvent",
+                                    MedusaHelpers.PremisOwlNamespace, linkEvt.LocalIdentifierValue)
+          End If
         Next
+        pr.LinkedEvents.Clear()
 
         'linked rights statements
         For Each linkRts As PremisRightsStatement In pr.LinkedRightsStatements
           relsext.AddRelationship("premis", "linkingRightsStatement",
-                                  MedusaHelpers.PremisOwlNamespace, linkRts.RightsStatementIdentifier.IdentifierValue)
+                                    MedusaHelpers.PremisOwlNamespace, linkRts.RightsStatementIdentifier.IdentifierValue)
         Next
+        pr.LinkedRightsStatements.Clear()
 
         'linked intellectual entities
+        'TODO: Do we want this? It may link to something outside the repo
         For Each intEntId As PremisIdentifier In pr.LinkedIntellectualEntityIdentifiers
           relsext.AddRelationship("premis", "linkingIntellectualEntity ",
                                   MedusaHelpers.PremisOwlNamespace, intEntId.IdentifierValue)
         Next
+        'pr.LinkedIntellectualEntityIdentifiers.Clear()
+
+        If pr.ObjectCategory = PremisObjectCategory.File Then
+          relsext.AddContentModel("afmodel:Premis_File_Object")
+        ElseIf pr.ObjectCategory = PremisObjectCategory.Representation Then
+          relsext.AddContentModel("afmodel:Premis_Representation_Object")
+        End If
 
         fxObj.DataStreams.Add(relsext.Datastream)
 
-        'TODO: If this object is linked to a related DC or MODS metadata file then use that to create a DC datastream
-
-
-        Dim fxDS As New FoxmlDatastream("PREMIS-OBJECT", ControlGroups.X)
-        Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
-        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Object")
-        fxDS.DatastreamVersions.Add(fxDSV)
-        fxObj.DataStreams.Add(fxDS)
 
         If pr.ObjectCategory = PremisObjectCategory.File Then
-          'TODO: add a datastream for the file and convert the FILENAME Identifier into a URL to use for this datastream
+          'add a datastream for the file and convert the FILENAME Identifier into a URL to use for this datastream
           Dim fxDSFile As New FoxmlDatastream("FILE", ControlGroups.M)
           Dim fldr As String = origFolder.Replace(MedusaAppSettings.Settings.WorkingFolder, MedusaAppSettings.Settings.WorkingUrl).Replace("\", "/")
           Dim baseUrl As New Uri(New Uri(MedusaAppSettings.Settings.WorkingUrl), fldr & "/")
           Dim url As New Uri(baseUrl, pr.GetFilenameIdentifier.IdentifierValue)
           Dim fxDSFileV As New FoxmlDatastreamVersion(pr.ObjectCharacteristics.First.Formats.First.FormatName, url)
+          fxDSFileV.Label = pr.OriginalName
+
+          If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.FedoraChecksumAlgorithm) AndAlso MedusaAppSettings.Settings.FedoraChecksumAlgorithm.ToUpper <> "NONE" Then
+            fxDSFileV.ContentDigestType = MedusaAppSettings.Settings.FedoraChecksumAlgorithmNormalized
+            If MedusaAppSettings.Settings.ChecksumAlgorithm = MedusaAppSettings.Settings.FedoraChecksumAlgorithm AndAlso _
+              pr.ObjectCharacteristics.Count > 0 AndAlso _
+              Not String.IsNullOrWhiteSpace(pr.ObjectCharacteristics.First.GetMessageDigest(MedusaAppSettings.Settings.FedoraChecksumAlgorithm)) Then
+              'TODO: Can we set the digest???
+              fxDSFileV.ContentDigest = pr.ObjectCharacteristics.First.GetMessageDigest(MedusaAppSettings.Settings.FedoraChecksumAlgorithm)
+            End If
+          End If
           fxDSFile.DatastreamVersions.Add(fxDSFileV)
           fxObj.DataStreams.Add(fxDSFile)
+
+          pr.GetFilenameIdentifier.IdentifierValue = url.ToString 'this must come before changing the type
+          pr.GetFilenameIdentifier.IdentifierType = "URL"
         End If
+
+        Dim fxDS As New FoxmlDatastream(String.Format("PREMIS-{0}-OBJECT", pr.ObjectCategory.ToString.ToUpper), ControlGroups.X)
+        Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
+        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Object")
+        fxDSV.Label = String.Format("PREMIS {0} {1} Object", prDSVLabel, pr.ObjectCategory.ToString)
+        fxDS.DatastreamVersions.Add(fxDSV)
+        fxObj.DataStreams.Add(fxDS)
 
         'Save the XML
         fxObj.ValidateXML = True
-        Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_", "xml"))
+        Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_object_", "xml"))
         fxObj.SaveXML(fname)
 
       Next
@@ -176,72 +279,190 @@ Public Class MedusaHelpers
 
     If cont.PersistedEntityTypes.HasFlag(PremisEntityTypes.Events) Then
       For Each pr As PremisEvent In cont.Events
-        Dim fxEvt As New FoxmlDigitalObject(pr.EventIdentifier.IdentifierValue)
+        If IncludeEvent(pr) Then
+          Dim fxEvt As New FoxmlDigitalObject(pr.EventIdentifier.IdentifierValue)
 
-        'Convert the PREMIS Object Links and Relationships into RELS_EXT and (maybe?) remove those links from the PREMIS Object
-        Dim relsext As New RelsExt(pr.EventIdentifier.IdentifierValue)
-
-        'linked events
-        For Each kvp As KeyValuePair(Of PremisObject, List(Of String)) In pr.LinkedObjects
-          If kvp.Value.Count = 0 Then
-            relsext.AddRelationship("premis", "linkingObject",
-                                    MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+          If pr.EventOutcomeInformation.Count > 0 Then
+            fxEvt.Label = String.Format("PREMIS {0} Event: {1}", pr.EventType, pr.EventOutcomeInformation.First.EventOutcome)
           Else
-            For Each role In kvp.Value
-              relsext.AddRelationship("medusa", String.Format("linkingObject.{0}", role),
-                                      MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
-            Next
+            fxEvt.Label = String.Format("PREMIS {0} Event", pr.EventType)
           End If
 
-        Next
+          'Convert the PREMIS Event Links  into RELS_EXT and (maybe?) remove those links from the PREMIS Object
+          Dim relsext As New RelsExt(pr.EventIdentifier.IdentifierValue)
 
-        'linked agents
-        For Each kvp As KeyValuePair(Of PremisAgent, List(Of String)) In pr.LinkedAgents
-          If kvp.Value.Count = 0 Then
-            relsext.AddRelationship("premis", "linkingAgent",
-                                    MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
-          Else
-            For Each role In kvp.Value
-              relsext.AddRelationship("medusa", String.Format("linkingAgent.{0}", role),
+          'linked objects
+          For Each kvp As KeyValuePair(Of PremisObject, List(Of String)) In pr.LinkedObjects
+            If kvp.Value.Count = 0 Then
+              relsext.AddRelationship("premis", "linkingObject",
                                       MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
-            Next
-          End If
+            Else
+              For Each role In kvp.Value
+                relsext.AddRelationship("medusa", String.Format("linkingObject.{0}", role),
+                                        MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
+              Next
+            End If
 
-        Next
+          Next
+          pr.LinkedObjects.Clear()
 
-        fxEvt.DataStreams.Add(relsext.Datastream)
+          'linked agents
+          For Each kvp As KeyValuePair(Of PremisAgent, List(Of String)) In pr.LinkedAgents
+            If kvp.Value.Count = 0 Then
+              relsext.AddRelationship("premis", "linkingAgent",
+                                      MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+            Else
+              For Each role In kvp.Value
+                relsext.AddRelationship("medusa", String.Format("linkingAgent.{0}", role),
+                                        MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
+              Next
+            End If
 
-        'create premis-event datastream
-        Dim fxDS As New FoxmlDatastream("PREMIS-EVENT", ControlGroups.X)
-        Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
-        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Event")
-        fxDS.DatastreamVersions.Add(fxDSV)
-        fxEvt.DataStreams.Add(fxDS)
+          Next
+          pr.LinkedAgents.Clear()
 
-        'save file
-        fxEvt.ValidateXML = True
-        Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_", "xml"))
-        fxEvt.SaveXML(fname)
+          relsext.AddContentModel("afmodel:Premis_Event")
 
+          fxEvt.DataStreams.Add(relsext.Datastream)
+
+          'create premis-event datastream
+          Dim fxDS As New FoxmlDatastream("PREMIS-EVENT", ControlGroups.X)
+          Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
+          fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Event")
+          fxDSV.Label = fxEvt.Label
+          fxDS.DatastreamVersions.Add(fxDSV)
+          fxEvt.DataStreams.Add(fxDS)
+
+          'save file
+          fxEvt.ValidateXML = True
+          Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_event_", "xml"))
+          fxEvt.SaveXML(fname)
+        End If
       Next
     End If
 
     If cont.PersistedEntityTypes.HasFlag(PremisEntityTypes.Agents) Then
       For Each pr As PremisAgent In cont.Agents
+        Dim fxAgt As New FoxmlDigitalObject(pr.LocalIdentifierValue)
+        fxAgt.Label = String.Format("Premis {0} Agent: {1}", pr.AgentType, pr.AgentNames.First)
 
+        'Convert the PREMIS Agent Links  into RELS_EXT and (maybe?) remove those links from the PREMIS Rights
+        Dim relsext As New RelsExt(pr.LocalIdentifierValue)
+
+        'linked events
+        For Each evt As PremisEvent In pr.LinkedEvents
+          If IncludeEvent(evt) Then
+            relsext.AddRelationship("premis", "linkingEvent",
+                                    MedusaHelpers.PremisOwlNamespace, evt.EventIdentifier.IdentifierValue)
+          End If
+        Next
+        pr.LinkedEvents.Clear()
+
+        'linked rights statements
+        For Each rts As PremisRightsStatement In pr.LinkedRightsStatements
+          relsext.AddRelationship("premis", "linkingRightsStatement",
+                                  MedusaHelpers.PremisOwlNamespace, rts.RightsStatementIdentifier.IdentifierValue)
+        Next
+        pr.LinkedRightsStatements.Clear()
+
+        relsext.AddContentModel("afmodel:Premis_Agent")
+
+        fxAgt.DataStreams.Add(relsext.Datastream)
+
+        'create premis-agent datastream
+        Dim fxDS As New FoxmlDatastream("PREMIS-AGENT", ControlGroups.X)
+        Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
+        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Agent")
+        fxDSV.Label = fxAgt.Label
+        fxDS.DatastreamVersions.Add(fxDSV)
+        fxAgt.DataStreams.Add(fxDS)
+
+        'save file
+        fxAgt.ValidateXML = True
+        Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_agent_", "xml"))
+        fxAgt.SaveXML(fname)
       Next
     End If
 
     If cont.PersistedEntityTypes.HasFlag(PremisEntityTypes.Rights) Then
       For Each pr As PremisRights In cont.Rights
+        For Each rts As PremisRightsStatement In pr.RightsStatements
+          Dim fxRts As New FoxmlDigitalObject(rts.RightsStatementIdentifier.IdentifierValue)
+          fxRts.Label = String.Format("PREMIS {0} Rights Statement", rts.RightsBasis)
 
+          'Convert the PREMIS RightsStatement Links  into RELS_EXT and (maybe?) remove those links from the PREMIS Rights
+          Dim relsext As New RelsExt(rts.RightsStatementIdentifier.IdentifierValue)
+
+          'linked objects
+          For Each kvp As KeyValuePair(Of PremisObject, List(Of String)) In rts.LinkedObjects
+            If kvp.Value.Count = 0 Then
+              relsext.AddRelationship("premis", "linkingObject",
+                                      MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+            Else
+              For Each role In kvp.Value
+                relsext.AddRelationship("medusa", String.Format("linkingObject.{0}", role),
+                                        MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
+              Next
+            End If
+
+          Next
+          rts.LinkedObjects.Clear()
+
+          'linked agents
+          For Each kvp As KeyValuePair(Of PremisAgent, List(Of String)) In rts.LinkedAgents
+            If kvp.Value.Count = 0 Then
+              relsext.AddRelationship("premis", "linkingAgent",
+                                      MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
+            Else
+              For Each role In kvp.Value
+                relsext.AddRelationship("medusa", String.Format("linkingAgent.{0}", role),
+                                        MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
+              Next
+            End If
+
+          Next
+          rts.LinkedAgents.Clear()
+
+          relsext.AddContentModel("afmodel:Premis_Rights")
+
+          fxRts.DataStreams.Add(relsext.Datastream)
+
+          'create premis-rights datastream
+          Dim fxDS As New FoxmlDatastream("PREMIS-RIGHTS", ControlGroups.X)
+          Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
+          fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Rights")
+          fxDSV.Label = fxRts.Label
+          fxDS.DatastreamVersions.Add(fxDSV)
+          fxRts.DataStreams.Add(fxDS)
+
+          'save file
+          fxRts.ValidateXML = True
+          Dim fname As String = Path.Combine(origFolder, pr.GetDefaultFileName("foxml_rights_", "xml"))
+          fxRts.SaveXML(fname)
+
+        Next
       Next
     End If
 
   End Sub
 
-  Public Function CamelCase(s As String) As String
-    Dim ret As String = s
+  Private Shared Function IncludeEvent(evt As PremisEvent) As Boolean
+    Dim ret As Boolean = True
+
+    Select Case evt.EventType.ToUpper
+      Case "CAPTURE"
+        'do not include capture events unless they are not OK
+        ret = False
+        If evt.EventOutcomeInformation.Any(Function(e) e.EventOutcome.ToUpper <> "OK") Then
+          ret = True
+        End If
+
+      Case Else
+        'all other events are included
+        ret = True
+
+    End Select
+
     Return ret
   End Function
 

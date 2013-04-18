@@ -1,6 +1,7 @@
 ﻿Imports System.Net
 Imports System.IO
 Imports System.Xml
+Imports Uiuc.Library.MetadataUtilities
 
 Public Class FoxmlDatastreamVersion
 
@@ -48,19 +49,43 @@ Public Class FoxmlDatastreamVersion
     End Get
   End Property
 
+
+  ''' <summary>
+  ''' Content digest checksum algorithm
+  ''' </summary>
+  ''' <value>Name of the checksum algorithm to use: MD5 SHA-1 SHA-256 SHA-384 SHA-512 DISABLED DEFAULT</value>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
   Public Property ContentDigestType As String
 
   Private _contentDigest As String
-  Public ReadOnly Property ContentDigest As String
+  ''' <summary>
+  ''' Content digest checksum value for the datastream version.
+  ''' </summary>
+  ''' <value>Hexidecimal string value</value>
+  ''' <returns></returns>
+  ''' <remarks>This value must be a hexidecimal string, and beause of Fedora is must be lower-case letters.</remarks>
+  Public Property ContentDigest As String
     Get
-      Return _contentDigest
+      If _contentDigest IsNot Nothing Then
+        Return _contentDigest.ToLower
+      Else
+        Return _contentDigest
+      End If
     End Get
+    Set(value As String)
+      If Not MetadataFunctions.IsHexString(value) Then
+        Throw New FoxmlException("ContentDigest is not a valid hex string")
+      End If
+      _contentDigest = value.ToLower
+    End Set
   End Property
 
   Public Sub New(mimeType As String, xml As XmlDocument)
     AltIds = New List(Of Uri)
     Me.MimeType = mimeType
     Me.XmlContent = xml
+
   End Sub
 
   Public Sub New(mimeType As String, location As Uri)
@@ -129,7 +154,7 @@ Public Class FoxmlDatastreamVersion
     propElem = elem.SelectSingleNode("foxml:contentDigest", xmlns)
     If propElem IsNot Nothing Then
       ContentDigestType = propElem.GetAttribute("TYPE")
-      _contentDigest = propElem.GetAttribute("DIGEST")
+      ContentDigest = propElem.GetAttribute("DIGEST")
     End If
 
     propElem = elem.SelectSingleNode("foxml:contentLocation", xmlns)

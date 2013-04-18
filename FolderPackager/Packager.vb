@@ -16,6 +16,7 @@ Imports Uiuc.Library.Medusa
 'TODO: Add SignficantCharacterstics from the FITS output
 'TODO: Add a software agent to the packager itself (look at the creation event)
 'TODO: Determine which file is the METS file, if any
+'TODO: Keep a count of the number of files processed and report it in the log, including files processed per minute
 
 Module Packager
 

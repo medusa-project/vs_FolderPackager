@@ -567,6 +567,7 @@ Public Class FolderProcessor
 
       If parent IsNot Nothing Then
         parent.RelateToObject("METADATA", "MODS", modsObj)
+        modsObj.RelateToObject("METADATA", "PARENT", parent)
       End If
 
       'Add migration event and derivation relationship
@@ -834,12 +835,19 @@ Public Class FolderProcessor
 
     'copy the datetime settings to new file and maybe set it to readonly
     Dim finfoNew As New FileInfo(outFileName)
+    finfo.Refresh()
+    finfoNew.Refresh()
     finfoNew.IsReadOnly = False 'some files are originally set to readonly, must change this so they can be manipulated
     finfoNew.CreationTime = finfo.CreationTime
     finfoNew.LastAccessTime = finfo.LastAccessTime
     finfoNew.LastWriteTime = finfo.LastWriteTime
+    finfo.Refresh()
+    finfoNew.Refresh()
+
     'TODO: Maybe for security make it read-only after the move
     'finfoNew.IsReadOnly = True
+    finfo.Refresh()
+    finfoNew.Refresh()
 
     Dim evtInfoOK As New PremisEventOutcomeInformation("OK")
     pEvt.EventOutcomeInformation.Add(evtInfoOK)

@@ -197,6 +197,12 @@
       <LastGenOutput>Reference.vb</LastGenOutput>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\ContentDMPackager\MetadataUtilities\MetadataUtilities.vbproj">
+      <Project>{d03d3545-eb61-43df-9736-8d0502f3be9d}</Project>
+      <Name>MetadataUtilities</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
