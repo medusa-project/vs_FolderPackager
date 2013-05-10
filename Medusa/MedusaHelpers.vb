@@ -104,6 +104,30 @@ Public Class MedusaHelpers
   End Sub
 
   ''' <summary>
+  ''' Save just this one Premis Entity in a FoxML file
+  ''' </summary>
+  ''' <param name="pr"></param>
+  ''' <param name="origFolder"></param>
+  ''' <remarks></remarks>
+  Public Shared Sub SaveFoxML(pr As PremisEntity, origFolder As String)
+    Dim cont As New PremisContainer()
+
+    If TypeOf pr Is PremisAgent Then
+      cont.Agents.Add(pr)
+    ElseIf TypeOf pr Is PremisEvent Then
+      cont.Events.Add(pr)
+    ElseIf TypeOf pr Is PremisRights Then
+      cont.Rights.Add(pr)
+    ElseIf TypeOf pr Is PremisObject Then
+      cont.Objects.Add(pr)
+    Else
+      Throw New MedusaException("Unexpected PREMIS entity type")
+    End If
+
+    MedusaHelpers.SaveFoxML(cont, origFolder)
+  End Sub
+
+  ''' <summary>
   ''' Save each PREMIS Entity to its own FoxML ingest package, converting all links and relationships into RELS-EXT
   ''' </summary>
   ''' <param name="cont"></param>
@@ -128,14 +152,14 @@ Public Class MedusaHelpers
           End If
 
           For Each obj As PremisObject In relat.RelatedObjects
-            relsext.AddRelationship("medusa", String.Format("{0}.{1}", relat.RelationshipType, relat.RelationshipSubType),
+            relsext.AddRelationship("medusa", MedusaHelpers.CamelCaseIt(String.Format("{0}.{1}", relat.RelationshipType, relat.RelationshipSubType)),
                                     MedusaHelpers.MedusaNamespace, obj.LocalIdentifierValue)
           Next
           'NOTE: PREMIS Relationships can also have a corresponding Premis Event; if we remove the relationship from the PREMIS document we also lose the
           'correspondence of the event to the relationship
           For Each evt As PremisEvent In relat.RelatedEvents
             If IncludeEvent(evt) Then
-              relsext.AddRelationship("medusa", String.Format("{0}.{1}.linkingEvent", relat.RelationshipType, relat.RelationshipSubType),
+              relsext.AddRelationship("medusa", MedusaHelpers.CamelCaseIt(String.Format("{0}.{1}.linkingEvent", relat.RelationshipType, relat.RelationshipSubType)),
                                       MedusaHelpers.MedusaNamespace, evt.LocalIdentifierValue)
             End If
           Next
@@ -229,9 +253,9 @@ Public Class MedusaHelpers
         'pr.LinkedIntellectualEntityIdentifiers.Clear()
 
         If pr.ObjectCategory = PremisObjectCategory.File Then
-          relsext.AddContentModel("afmodel:Premis_File_Object")
+          relsext.AddContentModel("afmodel:MedusaPremisFileObject")
         ElseIf pr.ObjectCategory = PremisObjectCategory.Representation Then
-          relsext.AddContentModel("afmodel:Premis_Representation_Object")
+          relsext.AddContentModel("afmodel:MedusaPremisRepresentationObject")
         End If
 
         fxObj.DataStreams.Add(relsext.Datastream)
@@ -239,7 +263,7 @@ Public Class MedusaHelpers
 
         If pr.ObjectCategory = PremisObjectCategory.File Then
           'add a datastream for the file and convert the FILENAME Identifier into a URL to use for this datastream
-          Dim fxDSFile As New FoxmlDatastream("FILE", ControlGroups.M)
+          Dim fxDSFile As New FoxmlDatastream("content", ControlGroups.M)
           Dim fldr As String = origFolder.Replace(MedusaAppSettings.Settings.WorkingFolder, MedusaAppSettings.Settings.WorkingUrl).Replace("\", "/")
           Dim baseUrl As New Uri(New Uri(MedusaAppSettings.Settings.WorkingUrl), fldr & "/")
           Dim url As New Uri(baseUrl, pr.GetFilenameIdentifier.IdentifierValue)
@@ -263,8 +287,9 @@ Public Class MedusaHelpers
         End If
 
         Dim fxDS As New FoxmlDatastream(String.Format("PREMIS-{0}-OBJECT", pr.ObjectCategory.ToString.ToUpper), ControlGroups.X)
+        fxDS.Versionable = False
         Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
-        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Object")
+        fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & pr.ObjectCategory.ToString)
         fxDSV.Label = String.Format("PREMIS {0} {1} Object", prDSVLabel, pr.ObjectCategory.ToString)
         fxDS.DatastreamVersions.Add(fxDSV)
         fxObj.DataStreams.Add(fxDS)
@@ -298,7 +323,7 @@ Public Class MedusaHelpers
                                       MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
             Else
               For Each role In kvp.Value
-                relsext.AddRelationship("medusa", String.Format("linkingObject.{0}", role),
+                relsext.AddRelationship("medusa", MedusaHelpers.CamelCaseIt(String.Format("linkingObject.{0}", role)),
                                         MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
               Next
             End If
@@ -313,7 +338,7 @@ Public Class MedusaHelpers
                                       MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
             Else
               For Each role In kvp.Value
-                relsext.AddRelationship("medusa", String.Format("linkingAgent.{0}", role),
+                relsext.AddRelationship("medusa", MedusaHelpers.CamelCaseIt(String.Format("linkingAgent.{0}", role)),
                                         MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
               Next
             End If
@@ -321,12 +346,13 @@ Public Class MedusaHelpers
           Next
           pr.LinkedAgents.Clear()
 
-          relsext.AddContentModel("afmodel:Premis_Event")
+          relsext.AddContentModel("afmodel:MedusaPremisEvent")
 
           fxEvt.DataStreams.Add(relsext.Datastream)
 
           'create premis-event datastream
           Dim fxDS As New FoxmlDatastream("PREMIS-EVENT", ControlGroups.X)
+          fxDS.Versionable = False
           Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
           fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Event")
           fxDSV.Label = fxEvt.Label
@@ -365,12 +391,13 @@ Public Class MedusaHelpers
         Next
         pr.LinkedRightsStatements.Clear()
 
-        relsext.AddContentModel("afmodel:Premis_Agent")
+        relsext.AddContentModel("afmodel:MedusaPremisAgent")
 
         fxAgt.DataStreams.Add(relsext.Datastream)
 
         'create premis-agent datastream
         Dim fxDS As New FoxmlDatastream("PREMIS-AGENT", ControlGroups.X)
+        fxDS.Versionable = False
         Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
         fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Agent")
         fxDSV.Label = fxAgt.Label
@@ -400,7 +427,7 @@ Public Class MedusaHelpers
                                       MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
             Else
               For Each role In kvp.Value
-                relsext.AddRelationship("medusa", String.Format("linkingObject.{0}", role),
+                relsext.AddRelationship("medusa", MedusaHelpers.CamelCaseIt(String.Format("linkingObject.{0}", role)),
                                         MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
               Next
             End If
@@ -415,7 +442,7 @@ Public Class MedusaHelpers
                                       MedusaHelpers.PremisOwlNamespace, kvp.Key.LocalIdentifierValue)
             Else
               For Each role In kvp.Value
-                relsext.AddRelationship("medusa", String.Format("linkingAgent.{0}", role),
+                relsext.AddRelationship("medusa", MedusaHelpers.CamelCaseIt(String.Format("linkingAgent.{0}", role)),
                                         MedusaHelpers.MedusaNamespace, kvp.Key.LocalIdentifierValue)
               Next
             End If
@@ -423,12 +450,13 @@ Public Class MedusaHelpers
           Next
           rts.LinkedAgents.Clear()
 
-          relsext.AddContentModel("afmodel:Premis_Rights")
+          relsext.AddContentModel("afmodel:MedusaPremisRights")
 
           fxRts.DataStreams.Add(relsext.Datastream)
 
           'create premis-rights datastream
           Dim fxDS As New FoxmlDatastream("PREMIS-RIGHTS", ControlGroups.X)
+          fxDS.Versionable = False
           Dim fxDSV As New FoxmlDatastreamVersion("text/xml", pr.GetXmlDocument(cont))
           fxDSV.FormatUri = New Uri(MedusaHelpers.PremisOwlNamespace & "Rights")
           fxDSV.Label = fxRts.Label
@@ -1037,5 +1065,30 @@ Public Class MedusaHelpers
 
   End Function
 
+  ''' <summary>
+  ''' Convert a name such as 'This_is_name.last' to camel case such as 'thisIsNameLast'
+  ''' </summary>
+  ''' <param name="name"></param>
+  ''' <returns></returns>
+  ''' <remarks></remarks>
+  Public Shared Function CamelCaseIt(name As String) As String
+    If String.IsNullOrWhiteSpace(name) Then
+      Return name
+    End If
+
+    Dim delims() As Char = {"-"c, "."c, "~"c, "_"c, " "c}
+
+    Dim parts() As String = name.Split(delims, StringSplitOptions.RemoveEmptyEntries)
+
+    Dim ret As String = ""
+
+    For Each part In parts
+      ret = ret & StrConv(part.ToLower, VbStrConv.ProperCase)
+    Next
+
+    'initial letter is lowercase
+    Return ret.Substring(0, 1).ToLower & ret.Substring(1)
+
+  End Function
 
 End Class

@@ -1,17 +1,17 @@
 ﻿<?xml version="1.0" encoding="UTF-8"?>
-<foxml:digitalObject VERSION="1.1" PID="afmodel:MedusaPremisRights"
+<foxml:digitalObject VERSION="1.1" PID="afmodel:MedusaPremisRightsStatement"
     xmlns:foxml="info:fedora/fedora-system:def/foxml#"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:schemaLocation="info:fedora/fedora-system:def/foxml# http://www.fedora.info/definitions/1/0/foxml1-1.xsd">
   <foxml:objectProperties>
     <foxml:property NAME="info:fedora/fedora-system:def/model#state" VALUE="A"/>
-    <foxml:property NAME="info:fedora/fedora-system:def/model#label" VALUE="Content Model for PREMIS Agents"/>
+    <foxml:property NAME="info:fedora/fedora-system:def/model#label" VALUE="Content Model for PREMIS Rights"/>
   </foxml:objectProperties>
   <foxml:datastream ID="RELS-EXT" STATE="A" CONTROL_GROUP="X" VERSIONABLE="true">
     <foxml:datastreamVersion ID="RELS-EXT.0" LABEL="RDF Statements about this object" MIMETYPE="application/rdf+xml" FORMAT_URI="info:fedora/fedora-system:FedoraRELSExt-1.0" >
       <foxml:xmlContent>
         <rdf:RDF xmlns:fedora-model="info:fedora/fedora-system:def/model#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-          <rdf:Description rdf:about="info:fedora/afmodel:MedusaPremisRights">
+          <rdf:Description rdf:about="info:fedora/afmodel:MedusaPremisRightsStatement">
             <fedora-model:hasModel rdf:resource="info:fedora/fedora-system:ContentModel-3.0"></fedora-model:hasModel>
           </rdf:Description>
         </rdf:RDF>

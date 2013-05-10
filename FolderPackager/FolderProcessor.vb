@@ -37,6 +37,11 @@ Public Class FolderProcessor
   Private pFitsAgent As PremisAgent
   Private pSoftAgent As PremisAgent
 
+  'use to keep from saving the same agent xml file multiplke times during same processor run
+  Private pUserAgentSaved As Boolean = False
+  Private pFitsAgentSaved As Boolean = False
+  Private pSoftAgentSaved As Boolean = False
+
   Private pRepresentation As PremisObject 'the root representation object which is being packaged
   Private pPages As MedusaFullDsdBookPages 'only used for the Full DSD Book preservation level
 
@@ -175,63 +180,81 @@ Public Class FolderProcessor
 
         pUserAgent = MedusaHelpers.GetPremisAgent
         pUserAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pUserAgent.AgentIdentifiers.First.IdentifierValue))
-        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+        If pUserAgentSaved = False AndAlso Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
           Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", "")))
-          pUserAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", ""), pUserAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+          If MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA_FOXML Then
+            'Save as FoxML
+            MedusaHelpers.SaveFoxML(pUserAgent, Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", "")))
+          Else
+            pUserAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", ""), pUserAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+          End If
+          pUserAgentSaved = True
         End If
 
         pSoftAgent = PremisAgent.GetCurrentSoftwareAgent()
         pSoftAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pSoftAgent.AgentIdentifiers.First.IdentifierValue))
-        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+        If pSoftAgentSaved = False AndAlso Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
           Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", "")))
-          pSoftAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", ""), pSoftAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
-        End If
-
-        'register a handle for the root object 
-        If MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_AND_FILES Or MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_ONLY Then
-          Dim regHandle As String = RegisterFileHandle(destPath, pRepresentation)
-        End If
-
-        Dim files As List(Of String) = Directory.EnumerateFiles(sourceFolder).ToList
-        For Each fl In files
-          If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OmitFilesRegex) OrElse Not Regex.IsMatch(fl, MedusaAppSettings.Settings.OmitFilesRegex, RegexOptions.IgnoreCase) Then
-            Dim fat = File.GetAttributes(fl)
-            If Not (fat.HasFlag(FileAttributes.System) Or fat.HasFlag(FileAttributes.Hidden)) Then
-              Dim relatType As String = MedusaHelpers.GetMedusaRelationshipType(fl, "BASIC_FILE_ASSET")
-              Dim relatSubtype As String = MedusaHelpers.GetMedusaRelationshipSubtype(fl, relatType, "UNSPECIFIED")
-              Dim capfile As String = CaptureFile(fl, destPath, pRepresentation, relatType, relatSubtype)
-            End If
+          If MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA_FOXML Then
+            'Save as foxml
+            MedusaHelpers.SaveFoxML(pSoftAgent, Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", "")))
           Else
-            Trace.TraceWarning(String.Format("Skipping file '{0}'.", fl))
+            pSoftAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", ""), pSoftAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
           End If
-        Next
-
-        Dim folders As List(Of String) = Directory.EnumerateDirectories(sourceFolder).ToList
-        For Each fld In folders
-          ProcessFolder(fld, destPath, pRepresentation)
-        Next
-
-        'create the premis rights statement for dissemination rights
-        Dim pRt As PremisRights = MedusaHelpers.GetPremisDisseminationRights("LOCAL", pContainer.NextID, pRepresentation)
-        If pRt IsNot Nothing Then
-          pContainer.Rights.Add(pRt)
+          pSoftAgentSaved = True
         End If
 
-        idType = IdManager.GetIdType(collHandle)
+          'register a handle for the root object 
+          If MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_AND_FILES Or MedusaAppSettings.Settings.HandleGeneration = HandleGenerationType.ROOT_OBJECT_ONLY Then
+            Dim regHandle As String = RegisterFileHandle(destPath, pRepresentation)
+          End If
 
-        pRepresentation.RelateToObject("COLLECTION", "IS_MEMBER_OF", idType, collHandle)
+          Dim files As List(Of String) = Directory.EnumerateFiles(sourceFolder).ToList
+          For Each fl In files
+            If String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.OmitFilesRegex) OrElse Not Regex.IsMatch(fl, MedusaAppSettings.Settings.OmitFilesRegex, RegexOptions.IgnoreCase) Then
+              Dim fat = File.GetAttributes(fl)
+              If Not (fat.HasFlag(FileAttributes.System) Or fat.HasFlag(FileAttributes.Hidden)) Then
+                Dim relatType As String = MedusaHelpers.GetMedusaRelationshipType(fl, "BASIC_FILE_ASSET")
+                Dim relatSubtype As String = MedusaHelpers.GetMedusaRelationshipSubtype(fl, relatType, "UNSPECIFIED")
+                Dim capfile As String = CaptureFile(fl, destPath, pRepresentation, relatType, relatSubtype)
+              End If
+            Else
+              Trace.TraceWarning(String.Format("Skipping file '{0}'.", fl))
+            End If
+          Next
 
-        pContainer.Agents.Add(pUserAgent)
+          Dim folders As List(Of String) = Directory.EnumerateDirectories(sourceFolder).ToList
+          For Each fld In folders
+            ProcessFolder(fld, destPath, pRepresentation)
+          Next
 
-        pContainer.Agents.Add(pSoftAgent)
+          'create the premis rights statement for dissemination rights
+          Dim pRt As PremisRights = MedusaHelpers.GetPremisDisseminationRights("LOCAL", pContainer.NextID, pRepresentation)
+          If pRt IsNot Nothing Then
+            pContainer.Rights.Add(pRt)
+          End If
 
-        If pFitsAgent IsNot Nothing Then
-          pFitsAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pFitsAgent.AgentIdentifiers.First.IdentifierValue))
-          If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+          idType = IdManager.GetIdType(collHandle)
+
+          pRepresentation.RelateToObject("COLLECTION", "IS_MEMBER_OF", idType, collHandle)
+
+          pContainer.Agents.Add(pUserAgent)
+
+          pContainer.Agents.Add(pSoftAgent)
+
+          If pFitsAgent IsNot Nothing Then
+            pFitsAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pFitsAgent.AgentIdentifiers.First.IdentifierValue))
+          If pFitsAgentSaved = False AndAlso Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
             Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pFitsAgent.GetDefaultFileName("", "")))
-            pFitsAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pFitsAgent.GetDefaultFileName("", ""), pFitsAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+            If MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA_FOXML Then
+              'Save As foxml
+              MedusaHelpers.SaveFoxML(pFitsAgent, Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pFitsAgent.GetDefaultFileName("", "")))
+            Else
+              pFitsAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pFitsAgent.GetDefaultFileName("", ""), pFitsAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
+            End If
           End If
           pContainer.Agents.Add(pFitsAgent)
+          pFitsAgentSaved = True
         End If
 
         Dim pEvt As New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
@@ -251,22 +274,22 @@ Public Class FolderProcessor
         MedusaHelpers.SavePremisContainer(pContainer, destPath)
       End If
 
-    ElseIf folderStack.Count > objectFolderLevel Then
+        ElseIf folderStack.Count > objectFolderLevel Then
 
-      'this folder represents the components of an object, all its files and subfolders are processed
+          'this folder represents the components of an object, all its files and subfolders are processed
 
-      Console.Out.WriteLine(String.Format("Subfolder: {0}", sourceFolder))
+          Console.Out.WriteLine(String.Format("Subfolder: {0}", sourceFolder))
 
-      If MedusaAppSettings.Settings.PreservationLevel = "FULL_DSD_BOOK" And Regex.IsMatch(sourceFolder, MedusaAppSettings.Settings.PageFoldersRegex) Then
-        ProcessFullDsdBook(destPath, sourceFolder)
+          If MedusaAppSettings.Settings.PreservationLevel = "FULL_DSD_BOOK" And Regex.IsMatch(sourceFolder, MedusaAppSettings.Settings.PageFoldersRegex) Then
+            ProcessFullDsdBook(destPath, sourceFolder)
 
-      Else 'default is FILE_SYSTEM_FOLDER; bit-level preservation of folder contents
-        ProcessFileSystemFolder(destPath, sourceFolder, parentObject)
-      End If
+          Else 'default is FILE_SYSTEM_FOLDER; bit-level preservation of folder contents
+            ProcessFileSystemFolder(destPath, sourceFolder, parentObject)
+          End If
 
-    End If
+        End If
 
-    folderStack.Pop()
+        folderStack.Pop()
   End Sub
 
   Private Sub ProcessFullDsdBook(destPath As String, sourcefolder As String)
@@ -388,7 +411,7 @@ Public Class FolderProcessor
     Dim pEvtFits As PremisEvent = Nothing
     If MedusaAppSettings.Settings.DoFits = True Then
       Dim fts As New FitsResult(filename)
-      pObjChars.ObjectCharacteristicsExtensions.Add(fts.FitsXml)
+      'pObjChars.ObjectCharacteristicsExtensions.Add(fts.FitsXml) 'this is not needed because the FITS XML is stored in the eventOutcomeDetail of the event
       pObjChars.Formats.AddRange(fts.PremisFormats)
       pObjChars.Fixities.AddRange(fts.PremisFixities)
       pObjChars.CreatingApplications.AddRange(fts.PremisCreatingApplications)
@@ -834,6 +857,7 @@ Public Class FolderProcessor
     End If
 
     'copy the datetime settings to new file and maybe set it to readonly
+    'TODO: Investigate error: if user browses to working folder while this code is executing, and error occurs
     Dim finfoNew As New FileInfo(outFileName)
     finfo.Refresh()
     finfoNew.Refresh()

@@ -111,85 +111,96 @@ Public Class Processor
     pUserAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pUserAgent.AgentIdentifiers.First.IdentifierValue))
     If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
       Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", "")))
-      pUserAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", ""), pUserAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
-    End If
-
-    Dim pSoftAgent As PremisAgent = PremisAgent.GetCurrentSoftwareAgent()
-    pSoftAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pSoftAgent.AgentIdentifiers.First.IdentifierValue))
-    If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
-      Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", "")))
-      pSoftAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", ""), pSoftAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
-    End If
-
-    pContainer.Agents.Add(pUserAgent)
-    pContainer.Agents.Add(pSoftAgent)
-
-    Dim pEvt As New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
-    pEvt.LinkToAgent(pUserAgent)
-    pEvt.LinkToAgent(pSoftAgent)
-    pEvt.LinkToObject(pObj)
-    pContainer.Events.Add(pEvt)
-
-    Dim pObj2 As New PremisObject("FILENAME", "mods.xml", PremisObjectCategory.File, "text/xml")
-    pObj2.ObjectIdentifiers.Insert(0, pContainer.NextLocalIdentifier)
-    If collrec IsNot Nothing And collrec.ModsXml IsNot Nothing Then
-      pObj2.ObjectCharacteristics.Add(collrec.PremisObjectCharacteristics)
-    End If
-    pContainer.Objects.Add(pObj2)
-
-    'rename mods file to use uuid 
-    Dim newFName As String = pObj2.GetDefaultFileName("mods_", ".xml")
-    If File.Exists(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName)) Then
-      File.Delete(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName))
-    End If
-    My.Computer.FileSystem.MoveFile(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, "mods.xml"), Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName))
-    pObj2.GetFilenameIdentifier.IdentifierValue = newFName
-
-    Dim pEvt2 As PremisEvent
-    If collrec Is Nothing Then
-      pEvt2 = New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
-      pEvt2.EventDetail = String.Format("The {0} file was derived from preconfigured collection data.  It is expected to be manually edited to add data.", newFName)
-    Else
-      pEvt2 = collrec.PremisEvent
-      pEvt2.EventIdentifier.IdentifierType = "LOCAL"
-      pEvt2.EventIdentifier.IdentifierValue = pContainer.NextID
-    End If
-    pEvt2.LinkToAgent(pUserAgent)
-    pEvt2.LinkToAgent(pSoftAgent)
-    pEvt2.LinkToObject(pObj2)
-    pContainer.Events.Add(pEvt2)
-
-
-    pObj.RelateToObject("METADATA", "MODS", pObj2)
-
-    If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRights) Then
-      Dim pRgtStmt As New PremisRightsStatement("LOCAL", pContainer.NextID, MedusaAppSettings.Settings.PremisDisseminationRightsBasis)
-      pRgtStmt.RightsGranted.Add(New PremisRightsGranted(MedusaAppSettings.Settings.PremisDisseminationRights))
-      pRgtStmt.LinkToObject(pObj)
-      If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions) Then
-        pRgtStmt.RightsGranted.FirstOrDefault.Restrictions.Add(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions)
+      If MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA_FOXML Then
+        'save as foxml
+        MedusaHelpers.SaveFoxML(pUserAgent, Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", "")))
+      Else
+        pUserAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pUserAgent.GetDefaultFileName("", ""), pUserAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
       End If
-      If MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.COPYRIGHT And
-        Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus) Then
-        Dim cpyRt As New PremisCopyrightInformation(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus, "United States")
-        pRgtStmt.CopyrightInformation = cpyRt
+
+    End If
+
+      Dim pSoftAgent As PremisAgent = PremisAgent.GetCurrentSoftwareAgent()
+      pSoftAgent.AgentIdentifiers.Insert(0, IdManager.GetLocalPremisIdentifier(pSoftAgent.AgentIdentifiers.First.IdentifierValue))
+      If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+        Directory.CreateDirectory(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", "")))
+      If MedusaAppSettings.Settings.SaveFilesAs = SaveFileAsType.MEDUSA_FOXML Then
+        'Save as Foxml
+        MedusaHelpers.SaveFoxML(pSoftAgent, Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", "")))
+      Else
+        pSoftAgent.SaveXML(Path.Combine(MedusaAppSettings.Settings.AgentsFolder, pSoftAgent.GetDefaultFileName("", ""), pSoftAgent.GetDefaultFileName("premis_agent_", "xml")), pContainer)
       End If
-      Dim pRt As New PremisRights(pRgtStmt)
-      pContainer.Rights.Add(pRt)
     End If
 
-    If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
-      pContainer.PersistedEntityTypes = PremisEntityTypes.AllExceptAgents
-    End If
+      pContainer.Agents.Add(pUserAgent)
+      pContainer.Agents.Add(pSoftAgent)
 
-    MedusaHelpers.SavePremisContainer(pContainer, Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", "")))
+      Dim pEvt As New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
+      pEvt.LinkToAgent(pUserAgent)
+      pEvt.LinkToAgent(pSoftAgent)
+      pEvt.LinkToObject(pObj)
+      pContainer.Events.Add(pEvt)
 
-    'pContainer.SaveXML(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("premis_object_", "xml")))
+      Dim pObj2 As New PremisObject("FILENAME", "mods.xml", PremisObjectCategory.File, "text/xml")
+      pObj2.ObjectIdentifiers.Insert(0, pContainer.NextLocalIdentifier)
+      If collrec IsNot Nothing And collrec.ModsXml IsNot Nothing Then
+        pObj2.ObjectCharacteristics.Add(collrec.PremisObjectCharacteristics)
+      End If
+      pContainer.Objects.Add(pObj2)
 
-    'pContainer.SaveEachXML(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, "_").TrimEnd("_"))
+      'rename mods file to use uuid 
+      Dim newFName As String = pObj2.GetDefaultFileName("mods_", ".xml")
+      If File.Exists(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName)) Then
+        File.Delete(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName))
+      End If
+      My.Computer.FileSystem.MoveFile(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, "mods.xml"), Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", ""), newFName))
+      pObj2.GetFilenameIdentifier.IdentifierValue = newFName
+
+      Dim pEvt2 As PremisEvent
+      If collrec Is Nothing Then
+        pEvt2 = New PremisEvent("LOCAL", pContainer.NextID, "CREATION")
+        pEvt2.EventDetail = String.Format("The {0} file was derived from preconfigured collection data.  It is expected to be manually edited to add data.", newFName)
+      Else
+        pEvt2 = collrec.PremisEvent
+        pEvt2.EventIdentifier.IdentifierType = "LOCAL"
+        pEvt2.EventIdentifier.IdentifierValue = pContainer.NextID
+      End If
+      pEvt2.LinkToAgent(pUserAgent)
+      pEvt2.LinkToAgent(pSoftAgent)
+      pEvt2.LinkToObject(pObj2)
+      pContainer.Events.Add(pEvt2)
 
 
-    Return collHandle
+      pObj.RelateToObject("METADATA", "MODS", pObj2)
+
+      If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRights) Then
+        Dim pRgtStmt As New PremisRightsStatement("LOCAL", pContainer.NextID, MedusaAppSettings.Settings.PremisDisseminationRightsBasis)
+        pRgtStmt.RightsGranted.Add(New PremisRightsGranted(MedusaAppSettings.Settings.PremisDisseminationRights))
+        pRgtStmt.LinkToObject(pObj)
+        If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions) Then
+          pRgtStmt.RightsGranted.FirstOrDefault.Restrictions.Add(MedusaAppSettings.Settings.PremisDisseminationRightsRestrictions)
+        End If
+        If MedusaAppSettings.Settings.PremisDisseminationRightsBasis = MedusaAppSettings.COPYRIGHT And
+          Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus) Then
+          Dim cpyRt As New PremisCopyrightInformation(MedusaAppSettings.Settings.PremisDisseminationCopyrightStatus, "United States")
+          pRgtStmt.CopyrightInformation = cpyRt
+        End If
+        Dim pRt As New PremisRights(pRgtStmt)
+        pContainer.Rights.Add(pRt)
+      End If
+
+      If Not String.IsNullOrWhiteSpace(MedusaAppSettings.Settings.AgentsFolder) Then
+        pContainer.PersistedEntityTypes = PremisEntityTypes.AllExceptAgents
+      End If
+
+      MedusaHelpers.SavePremisContainer(pContainer, Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("", "")))
+
+      'pContainer.SaveXML(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, pObj.GetDefaultFileName("premis_object_", "xml")))
+
+      'pContainer.SaveEachXML(Path.Combine(MedusaAppSettings.Settings.CollectionsFolder, "_").TrimEnd("_"))
+
+
+      Return collHandle
   End Function
 
 

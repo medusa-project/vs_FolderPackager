@@ -120,6 +120,13 @@
       <Name>NetFedora</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="FedoraContentModels\cm_MedusaPremisAgent.xml" />
+    <Content Include="FedoraContentModels\cm_MedusaPremisEvent.xml" />
+    <Content Include="FedoraContentModels\cm_MedusaPremisFileObject.xml" />
+    <Content Include="FedoraContentModels\cm_MedusaPremisRepresentationObject.xml" />
+    <Content Include="FedoraContentModels\cm_MedusaPremisRights.xml" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
