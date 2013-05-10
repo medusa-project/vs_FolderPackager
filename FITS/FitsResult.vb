@@ -108,16 +108,22 @@ Public Class FitsResult
 
     Dim nds2 = _xml.SelectNodes("//fits:identification [@status='UNKNOWN']", _xmlns) 'unable to identify format
 
+    Dim evtInf As PremisEventOutcomeInformation
     If nds2.Count > 0 Then
-      Dim evtInf As New PremisEventOutcomeInformation("UNKNOWN")
-      pEvt.EventOutcomeInformation.Add(evtInf)
+      evtInf = New PremisEventOutcomeInformation("UNKNOWN")
     ElseIf nds.Count > 0 Then
-      Dim evtInf As New PremisEventOutcomeInformation("CONFLICTS")
-      pEvt.EventOutcomeInformation.Add(evtInf)
+      evtInf = New PremisEventOutcomeInformation("CONFLICTS")
     Else
-      Dim evtInf As New PremisEventOutcomeInformation("OK")
-      pEvt.EventOutcomeInformation.Add(evtInf)
+      evtInf = New PremisEventOutcomeInformation("OK")
     End If
+
+    'save the FITS xml in the event outcome details
+    Dim pEvtDet As New PremisEventOutcomeDetail(_xml.DocumentElement)
+
+    evtInf.EventOutcomeDetails.Add(pEvtDet)
+
+    pEvt.EventOutcomeInformation.Add(evtInf)
+
 
     Return pEvt
 
